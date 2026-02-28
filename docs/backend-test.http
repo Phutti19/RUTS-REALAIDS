@@ -1,0 +1,691 @@
+# RUTS-REALAIDS Backend Testing Guide
+# ทดสอบ API ทั้งหมดก่อนขึ้น Frontend
+
+# =============================================
+# วิธีทดสอบ
+# =============================================
+#
+# ตัวเลือก:
+#   1. Postman / Thunder Client (VS Code extension) — แนะนำ
+#   2. REST Client extension (VS Code) — ใช้ไฟล์ .http
+#   3. curl จาก terminal
+#
+# ไฟล์นี้เขียนเป็น .http format (ใช้กับ REST Client extension ได้เลย)
+# หรือ copy ไป Postman ก็ได้
+#
+# ติดตั้ง REST Client:
+#   VS Code → Extensions → ค้นหา "REST Client" → Install
+#   แล้วเปิดไฟล์นี้ → จะเห็นปุ่ม "Send Request" เหนือแต่ละ request
+#
+
+
+# =============================================
+# VARIABLES
+# =============================================
+@baseUrl = http://localhost:4000/api/v1
+@contentType = application/json
+
+# --- หลัง login จะได้ token มา ให้ copy มาวางตรงนี้ ---
+@studentToken = Bearer <paste-student-access-token-here>
+@staffToken = Bearer <paste-staff-access-token-here>
+@adminToken = Bearer <paste-admin-access-token-here>
+
+
+###################################################################
+# MODULE 1: AUTH
+# ทดสอบ: register, login, refresh, logout, password reset
+###################################################################
+
+### 1.1 Register — สร้าง admin user (ใช้ทดสอบ)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "admin@ruts.ac.th",
+  "password": "Admin@1234",
+  "firstName": "Admin",
+  "lastName": "System",
+  "phone": "0812345678",
+  "role": "admin"
+}
+
+### 1.2 Register — สร้าง staff user
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "nurse@ruts.ac.th",
+  "password": "Nurse@1234",
+  "firstName": "Somchai",
+  "lastName": "Jaidee",
+  "phone": "0823456789",
+  "role": "staff"
+}
+
+### 1.3 Register — สร้าง student user
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "student@ruts.ac.th",
+  "password": "Student@1234",
+  "firstName": "Somsri",
+  "lastName": "Meesuk",
+  "phone": "0834567890",
+  "role": "student",
+  "studentId": "6510001"
+}
+
+### 1.4 Login — admin
+# ✅ ต้องได้: accessToken + refreshToken
+# ❌ ผิด: 401 Unauthorized
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "admin@ruts.ac.th",
+  "password": "Admin@1234"
+}
+
+### 1.5 Login — wrong password (ทดสอบ login_attempts)
+# ✅ ต้องได้: 401 + failure_reason
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "admin@ruts.ac.th",
+  "password": "wrongpassword"
+}
+
+### 1.6 Login — student
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "student@ruts.ac.th",
+  "password": "Student@1234"
+}
+
+### 1.7 Login — staff
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "nurse@ruts.ac.th",
+  "password": "Nurse@1234"
+}
+
+### 1.8 Refresh Token
+# ✅ ต้องได้: accessToken ใหม่
+POST {{baseUrl}}/auth/refresh
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "<paste-refresh-token-here>"
+}
+
+### 1.9 Forgot Password
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: {{contentType}}
+
+{
+  "email": "student@ruts.ac.th"
+}
+
+### 1.10 Logout
+POST {{baseUrl}}/auth/logout
+Authorization: {{studentToken}}
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "<paste-refresh-token-here>"
+}
+
+
+###################################################################
+# MODULE 2: USERS
+# ทดสอบ: profile, health profile, user management
+###################################################################
+
+### 2.1 Get My Profile (student)
+# ✅ ต้องได้: ข้อมูล user ปัจจุบัน
+GET {{baseUrl}}/users/me
+Authorization: {{studentToken}}
+
+### 2.2 Update My Profile
+PUT {{baseUrl}}/users/me
+Authorization: {{studentToken}}
+Content-Type: {{contentType}}
+
+{
+  "firstName": "Somsri Updated",
+  "phone": "0899999999"
+}
+
+### 2.3 Create/Update Health Profile (student)
+PUT {{baseUrl}}/users/me/health-profile
+Authorization: {{studentToken}}
+Content-Type: {{contentType}}
+
+{
+  "bloodType": "O",
+  "allergies": "Penicillin, Aspirin",
+  "chronicDiseases": "Asthma",
+  "currentMedications": "Ventolin inhaler",
+  "emergencyContactName": "Mom Meesuk",
+  "emergencyContactPhone": "0811111111",
+  "emergencyContactRelation": "Mother"
+}
+
+### 2.4 Get Health Profile
+GET {{baseUrl}}/users/me/health-profile
+Authorization: {{studentToken}}
+
+### 2.5 List All Users (admin only)
+# ✅ admin: ต้องได้ list + pagination
+# ❌ student: ต้องได้ 403 Forbidden
+GET {{baseUrl}}/users?page=1&limit=10
+Authorization: {{adminToken}}
+
+### 2.6 List Users — student ลอง access (ต้อง 403)
+GET {{baseUrl}}/users?page=1&limit=10
+Authorization: {{studentToken}}
+
+
+###################################################################
+# MODULE 3: EMERGENCY INCIDENTS
+# ทดสอบ: แจ้งเหตุ, รับเหตุ, เปลี่ยนสถานะ, รูปภาพ
+###################################################################
+
+### 3.1 Report Emergency (student)
+# ✅ ต้องได้: incident object + status=pending
+POST {{baseUrl}}/incidents
+Authorization: {{studentToken}}
+Content-Type: {{contentType}}
+
+{
+  "incidentType": "injury",
+  "severity": "high",
+  "description": "Student fell down stairs at Building 5",
+  "latitude": 7.1910,
+  "longitude": 100.5935,
+  "locationName": "Building 5 stairway"
+}
+
+### 3.2 Report Another Emergency
+POST {{baseUrl}}/incidents
+Authorization: {{studentToken}}
+Content-Type: {{contentType}}
+
+{
+  "incidentType": "fainting",
+  "severity": "critical",
+  "description": "Student fainted in canteen",
+  "latitude": 7.1905,
+  "longitude": 100.5928,
+  "locationName": "Canteen"
+}
+
+### 3.3 List Incidents (staff)
+# ✅ ต้องได้: list ทั้งหมด
+GET {{baseUrl}}/incidents?page=1&limit=10
+Authorization: {{staffToken}}
+
+### 3.4 List Incidents — filter by status
+GET {{baseUrl}}/incidents?status=pending
+Authorization: {{staffToken}}
+
+### 3.5 Get Single Incident
+# แทน :id ด้วย UUID จาก step 3.1
+GET {{baseUrl}}/incidents/<incident-id>
+Authorization: {{staffToken}}
+
+### 3.6 Accept Incident (staff)
+# ✅ ต้อง: status เปลี่ยนเป็น accepted + สร้าง incident_responder + status_log
+POST {{baseUrl}}/incidents/<incident-id>/accept
+Authorization: {{staffToken}}
+
+### 3.7 Update Status — in_progress
+PATCH {{baseUrl}}/incidents/<incident-id>/status
+Authorization: {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "in_progress",
+  "note": "On the way to location"
+}
+
+### 3.8 Update Status — completed
+PATCH {{baseUrl}}/incidents/<incident-id>/status
+Authorization: {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "completed",
+  "note": "Patient treated and stable"
+}
+
+### 3.9 Get Status Logs (audit trail)
+# ✅ ต้องเห็น: pending→accepted→in_progress→completed
+GET {{baseUrl}}/incidents/<incident-id>/logs
+Authorization: {{staffToken}}
+
+### 3.10 Student ลอง accept (ต้อง 403)
+POST {{baseUrl}}/incidents/<incident-id>/accept
+Authorization: {{studentToken}}
+
+
+###################################################################
+# MODULE 4: PATIENT VISITS
+# ทดสอบ: สร้าง visit, จ่ายยา, คิว
+###################################################################
+
+### 4.1 Get Queue (waiting patients)
+GET {{baseUrl}}/visits/queue
+Authorization: {{staffToken}}
+
+### 4.2 Create Visit (staff)
+# ✅ สร้าง visit ใหม่ เชื่อมกับ incident (optional)
+POST {{baseUrl}}/visits
+Authorization: {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "patientId": "<student-user-id>",
+  "visitType": "emergency",
+  "incidentId": "<incident-id-from-step3>",
+  "chiefComplaint": "Fell down stairs, pain in left ankle",
+  "vitalSigns": {
+    "bp": "120/80",
+    "hr": 88,
+    "temp": 37.2,
+    "rr": 18
+  }
+}
+
+### 4.3 Get Visit Detail
+GET {{baseUrl}}/visits/<visit-id>
+Authorization: {{staffToken}}
+
+### 4.4 Update Visit — add diagnosis + treatment
+PATCH {{baseUrl}}/visits/<visit-id>
+Authorization: {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "diagnosis": "Sprained left ankle, grade 1",
+  "treatment": "Cold compress, bandage, pain medication",
+  "treatmentTypeId": "<treatment-type-id>",
+  "status": "in_treatment"
+}
+
+### 4.5 Dispense Medication
+# ✅ ต้อง: สร้าง visit_medication + ตัด stock อัตโนมัติ + สร้าง stock_log
+POST {{baseUrl}}/visits/<visit-id>/medications
+Authorization: {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "medicineId": "<medicine-id>",
+  "batchId": "<batch-id>",
+  "quantity": 10,
+  "dosageInstruction": "Take 1 tablet 3 times daily after meals"
+}
+
+### 4.6 Complete Visit
+PATCH {{baseUrl}}/visits/<visit-id>
+Authorization: {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "completed",
+  "notes": "Patient advised to rest for 2 days"
+}
+
+### 4.7 List Visits with filter
+GET {{baseUrl}}/visits?page=1&limit=10&status=completed
+Authorization: {{staffToken}}
+
+
+###################################################################
+# MODULE 5: MEDICAL CERTIFICATES
+###################################################################
+
+### 5.1 Create Certificate
+# ✅ ต้อง: auto-generate certificate_number (CERT-2025-000001)
+POST {{baseUrl}}/certificates
+Authorization: {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "visitId": "<visit-id>",
+  "diagnosisText": "Sprained left ankle, grade 1",
+  "recommendation": "Rest for 3 days, avoid physical activity",
+  "restDays": 3,
+  "restStartDate": "2025-03-01",
+  "restEndDate": "2025-03-03"
+}
+
+### 5.2 List Certificates
+GET {{baseUrl}}/certificates?page=1&limit=10
+Authorization: {{staffToken}}
+
+### 5.3 Get Certificate Detail
+GET {{baseUrl}}/certificates/<certificate-id>
+Authorization: {{staffToken}}
+
+### 5.4 Export PDF
+# ✅ ต้องได้: ไฟล์ PDF download
+GET {{baseUrl}}/certificates/<certificate-id>/pdf
+Authorization: {{staffToken}}
+
+
+###################################################################
+# MODULE 6: MEDICINES & BATCHES
+###################################################################
+
+### 6.1 Create Medicine
+POST {{baseUrl}}/medicines
+Authorization: {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Paracetamol 500mg",
+  "genericName": "Paracetamol",
+  "category": "medicine",
+  "unit": "tablet",
+  "description": "Pain reliever and fever reducer",
+  "minStockLevel": 100
+}
+
+### 6.2 Create Another Medicine
+POST {{baseUrl}}/medicines
+Authorization: {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Alcohol Swab",
+  "category": "supply",
+  "unit": "piece",
+  "minStockLevel": 50
+}
+
+### 6.3 Add Batch (receive stock)
+# ✅ ต้อง: สร้าง batch + อัปเดต medicines.stock_quantity + สร้าง stock_log
+POST {{baseUrl}}/medicines/<medicine-id>/batches
+Authorization: {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "batchNumber": "BATCH-2025-001",
+  "quantity": 500,
+  "expiryDate": "2026-06-30",
+  "note": "Received from supplier"
+}
+
+### 6.4 Add Another Batch (different expiry)
+POST {{baseUrl}}/medicines/<medicine-id>/batches
+Authorization: {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "batchNumber": "BATCH-2025-002",
+  "quantity": 200,
+  "expiryDate": "2025-04-15",
+  "note": "Near expiry batch"
+}
+
+### 6.5 List Medicines
+GET {{baseUrl}}/medicines?page=1&limit=10
+Authorization: {{staffToken}}
+
+### 6.6 Get Medicine Detail + Batches
+GET {{baseUrl}}/medicines/<medicine-id>
+Authorization: {{staffToken}}
+
+### 6.7 Get Batches
+GET {{baseUrl}}/medicines/<medicine-id>/batches
+Authorization: {{staffToken}}
+
+### 6.8 Get Stock Logs
+GET {{baseUrl}}/medicines/<medicine-id>/stock-logs
+Authorization: {{staffToken}}
+
+### 6.9 Low Stock Alert
+# ✅ ต้องแสดงยาที่ stock <= min_stock_level
+GET {{baseUrl}}/medicines/alerts/low-stock
+Authorization: {{staffToken}}
+
+### 6.10 Expiring Soon Alert
+# ✅ ต้องแสดง batch ที่หมดอายุใน 30 วัน
+GET {{baseUrl}}/medicines/alerts/expiring
+Authorization: {{staffToken}}
+
+
+###################################################################
+# MODULE 7: APPOINTMENTS
+###################################################################
+
+### 7.1 Create Slot (staff)
+POST {{baseUrl}}/appointment-slots
+Authorization: {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "dayOfWeek": 1,
+  "startTime": "09:00",
+  "endTime": "12:00",
+  "slotDurationMinutes": 30,
+  "maxPatientsPerSlot": 2
+}
+
+### 7.2 Create Another Slot
+POST {{baseUrl}}/appointment-slots
+Authorization: {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "dayOfWeek": 3,
+  "startTime": "13:00",
+  "endTime": "16:00",
+  "slotDurationMinutes": 30,
+  "maxPatientsPerSlot": 1
+}
+
+### 7.3 Get Available Slots
+GET {{baseUrl}}/appointment-slots/available?date=2025-03-03
+Authorization: {{studentToken}}
+
+### 7.4 Book Appointment (student)
+POST {{baseUrl}}/appointments
+Authorization: {{studentToken}}
+Content-Type: {{contentType}}
+
+{
+  "staffId": "<staff-user-id>",
+  "slotId": "<slot-id>",
+  "appointmentDate": "2025-03-03",
+  "appointmentTime": "09:30",
+  "reason": "Follow up on sprained ankle"
+}
+
+### 7.5 My Appointments (student)
+GET {{baseUrl}}/appointments/my
+Authorization: {{studentToken}}
+
+### 7.6 Today's Appointments (staff)
+GET {{baseUrl}}/appointments/today
+Authorization: {{staffToken}}
+
+### 7.7 Check-in
+PATCH {{baseUrl}}/appointments/<appointment-id>/check-in
+Authorization: {{staffToken}}
+
+### 7.8 Complete Appointment
+PATCH {{baseUrl}}/appointments/<appointment-id>/complete
+Authorization: {{staffToken}}
+
+### 7.9 Cancel Appointment
+PATCH {{baseUrl}}/appointments/<appointment-id>/cancel
+Authorization: {{studentToken}}
+Content-Type: {{contentType}}
+
+{
+  "cancelReason": "Cannot make it, will reschedule"
+}
+
+
+###################################################################
+# MODULE 8: NOTIFICATIONS
+###################################################################
+
+### 8.1 Get My Notifications
+GET {{baseUrl}}/notifications?page=1&limit=20
+Authorization: {{studentToken}}
+
+### 8.2 Unread Count
+GET {{baseUrl}}/notifications/unread-count
+Authorization: {{studentToken}}
+
+### 8.3 Mark as Read
+PATCH {{baseUrl}}/notifications/<notification-id>/read
+Authorization: {{studentToken}}
+
+### 8.4 Mark All as Read
+PATCH {{baseUrl}}/notifications/read-all
+Authorization: {{studentToken}}
+
+
+###################################################################
+# MODULE 9: REPORTS
+###################################################################
+
+### 9.1 Dashboard Summary
+GET {{baseUrl}}/reports/dashboard
+Authorization: {{staffToken}}
+
+### 9.2 Incident Statistics
+GET {{baseUrl}}/reports/incidents?from=2025-01-01&to=2025-12-31
+Authorization: {{staffToken}}
+
+### 9.3 Visit Statistics
+GET {{baseUrl}}/reports/visits?from=2025-01-01&to=2025-12-31
+Authorization: {{staffToken}}
+
+### 9.4 Medicine Statistics
+GET {{baseUrl}}/reports/medicines
+Authorization: {{staffToken}}
+
+### 9.5 Export Daily Report PDF
+GET {{baseUrl}}/reports/export/pdf?type=daily&date=2025-03-01
+Authorization: {{staffToken}}
+
+
+###################################################################
+# MODULE 10: SETTINGS (Admin)
+###################################################################
+
+### 10.1 Get All Settings
+GET {{baseUrl}}/settings
+Authorization: {{adminToken}}
+
+### 10.2 Get Infirmary Info
+GET {{baseUrl}}/settings/infirmary
+Authorization: {{staffToken}}
+
+### 10.3 Update Setting
+PUT {{baseUrl}}/settings/infirmary_phone
+Authorization: {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "value": "074-317200"
+}
+
+### 10.4 List Users (admin)
+GET {{baseUrl}}/admin/users?page=1&limit=10&role=student
+Authorization: {{adminToken}}
+
+### 10.5 Deactivate User
+PATCH {{baseUrl}}/admin/users/<user-id>/deactivate
+Authorization: {{adminToken}}
+
+### 10.6 Activate User
+PATCH {{baseUrl}}/admin/users/<user-id>/activate
+Authorization: {{adminToken}}
+
+### 10.7 Get Emergency Contacts
+GET {{baseUrl}}/emergency-contacts
+Authorization: {{staffToken}}
+
+### 10.8 Create Emergency Contact
+POST {{baseUrl}}/emergency-contacts
+Authorization: {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Songklanagarind Hospital",
+  "category": "hospital",
+  "phone": "074-451999",
+  "address": "15 Kanjanavanit Rd, Hat Yai",
+  "latitude": 7.0048,
+  "longitude": 100.4736,
+  "isPrimary": false
+}
+
+### 10.9 Create Backup
+POST {{baseUrl}}/backups
+Authorization: {{adminToken}}
+
+### 10.10 List Backups
+GET {{baseUrl}}/backups
+Authorization: {{adminToken}}
+
+
+###################################################################
+# SECURITY TESTS
+###################################################################
+
+### S.1 No Token — ต้อง 401
+GET {{baseUrl}}/users/me
+
+### S.2 Invalid Token — ต้อง 401
+GET {{baseUrl}}/users/me
+Authorization: Bearer invalid-token-here
+
+### S.3 Expired Token — ต้อง 401
+# ใช้ token เก่าที่หมดอายุแล้ว
+GET {{baseUrl}}/users/me
+Authorization: Bearer <expired-token>
+
+### S.4 Student access staff route — ต้อง 403
+GET {{baseUrl}}/admin/users
+Authorization: {{studentToken}}
+
+### S.5 Staff access admin route — ต้อง 403
+POST {{baseUrl}}/backups
+Authorization: {{staffToken}}
+
+### S.6 Brute Force — login ผิด 6 ครั้ง ต้อง lock
+# รัน 1.5 (wrong password) 6 ครั้ง ติดต่อกัน
+# ครั้งที่ 6 ต้องได้: 429 Too Many Requests หรือ Account Locked
+
+
+###################################################################
+# WEBSOCKET TEST
+###################################################################
+#
+# เปิด browser console หรือใช้ wscat:
+#   npm install -g wscat
+#   wscat -c ws://localhost:4000
+#
+# หลัง connect ส่ง auth:
+#   {"event":"auth","data":{"token":"<access-token>"}}
+#
+# แล้วลอง:
+#   1. เปิด 2 terminals (1=student, 1=staff)
+#   2. Student แจ้งเหตุผ่าน API (step 3.1)
+#   3. Staff terminal ต้องได้รับ event: incident:new
+#   4. Staff accept เหตุ (step 3.6)
+#   5. Student terminal ต้องได้รับ event: incident:accepted
+#
