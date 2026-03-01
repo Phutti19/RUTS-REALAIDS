@@ -153,26 +153,27 @@ ruts-realaids/
 - `login_attempts` — email, ip_address, success, failure_reason
 
 ### Emergency (5 tables)
-- `emergency_incidents` — reporter_id, incident_type, severity, lat/lng, status (pending→accepted→in_progress→completed)
-- `incident_images` — incident_id, image_url (multiple images per incident)
-- `incident_responders` — incident_id, responder_id, accepted_at, arrived_at
-- `incident_status_logs` — incident_id, old_status, new_status (audit trail)
+
+- `emergency_incidents` — reporter_id, incident_type, severity, latitude (NOT NULL), longitude (NOT NULL), location_name (nullable), status (pending→accepted→in_progress→completed)
+- `incident_images` — incident_id, image_url, caption, sort_order (default 0), **uploaded_at** (NOT NULL, ไม่ใช่ created_at)
+- `incident_responders` — incident_id, responder_id, accepted_at, arrived_at — unique constraint: **(incident_id, responder_id)**
+- `incident_status_logs` — incident_id, changed_by, **old_status** (NOT NULL), new_status, note — ห้าม INSERT NULL สำหรับ old_status
 - `emergency_contacts_directory` — name, category (hospital/police/rescue/fire), phone
 
 ### Infirmary (4 tables)
 - `treatment_types` — name (wound care, medication, vital signs, etc.)
-- `patient_visits` — patient_id, staff_id, incident_id, chief_complaint, diagnosis, vital_signs (JSONB), status
-- `visit_medications` — visit_id, medicine_id, batch_id, quantity, dosage_instruction
-- `medical_certificates` — visit_id, certificate_number (auto CERT-YYYY-NNNNNN), diagnosis_text, rest_days
+- `patient_visits` — patient_id, staff_id, incident_id, chief_complaint, diagnosis, vital_signs (JSONB), **treatment** (NOT NULL ไม่ใช่ treatment_notes), status, completed_at (ไม่ใช่ updated_at)
+- `visit_medications` — visit_id, medicine_id, batch_id, quantity, dosage_instruction, **dispensed_by** (NOT NULL)
+- `medical_certificates` — visit_id, certificate_number (auto CERT-YYYY-NNNNNN), diagnosis_text, rest_days, recommendation, rest_start_date, rest_end_date
 
 ### Medicines (3 tables)
 - `medicines` — name, category (medicine/supply/equipment), stock_quantity (cached), min_stock_level
-- `medicine_batches` — medicine_id, batch_number, quantity, expiry_date (per lot)
-- `medicine_stock_logs` — medicine_id, batch_id, action (received/dispensed/expired/adjusted), quantity_change
+- `medicine_batches` — medicine_id, batch_number, quantity, expiry_date, **received_by** (NOT NULL), received_at (default now()), note
+- `medicine_stock_logs` — medicine_id, batch_id, action (received/dispensed/expired/adjusted), quantity_change, **remaining_stock** (NOT NULL), **performed_by** (NOT NULL), **note** (ไม่ใช่ notes)
 
 ### Appointments (2 tables)
 - `appointment_slots` — staff_id, day_of_week, start_time, end_time, slot_duration_minutes
-- `appointments` — patient_id, staff_id, slot_id, date, time, status (scheduled/checked_in/completed/cancelled)
+- `appointments` — patient_id, staff_id, slot_id, **appointment_date** (NOT NULL), **appointment_time** (NOT NULL), **reason** (NOT NULL), notes (nullable), status (scheduled/checked_in/completed/cancelled), cancel_reason
 
 ### Notifications (2 tables)
 - `notifications` — user_id, type, title, message, reference_type, reference_id, is_read
@@ -181,13 +182,13 @@ ruts-realaids/
 ### System (3 tables)
 - `system_settings` — key/value pairs (infirmary_lat/lng, alert thresholds, etc.)
 - `audit_logs` — user_id, action, entity_type, entity_id, old_values, new_values (JSONB)
-- `data_backups` — filename, backup_type, status
+- `data_backups` — filename, backup_type, status, **file_size_bytes**, **performed_by** (ไม่ใช่ file_size / created_by), note, started_at, completed_at
 
 ### Helper Views
 - `v_medicines_expiring_soon` — medicines expiring within 30 days (from batches)
 - `v_medicines_low_stock` — medicines below min_stock_level
 - `v_daily_incident_stats` — daily incident count, avg response time
-- `v_medical_certificates` — certificates with patient name (JOIN replacement for removed patient_id)
+- `v_medical_certificates` — columns: patient_name, student_id, issued_by_name, issued_at (ไม่มี patient_first_name/last_name แยก)
 
 ## Key Enum Values
 
@@ -325,12 +326,19 @@ Events broadcast via WebSocket (`ws` library):
 ## Environment Variables
 
 ```env
-# Database
+# Database (Dev/Prod: ปรับตาม environment จริง)
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_NAME=ruts_realaids
 DATABASE_USER=realaids
 DATABASE_PASSWORD=realaids1234
+
+# Database (Remote Dev Server ที่ใช้จริงตอนนี้)
+# DATABASE_HOST=iot666.ddns.net
+# DATABASE_PORT=5435
+# DATABASE_NAME=ruts_realaids
+# DATABASE_USER=realaids
+# DATABASE_PASSWORD=realaids1234
 
 # JWT
 JWT_SECRET=<random-secret-key>
