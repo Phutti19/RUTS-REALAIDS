@@ -31,7 +31,7 @@ export interface IncidentImageRow {
   id: string;
   incident_id: string;
   image_url: string;
-  created_at: Date;
+  uploaded_at: Date;
 }
 
 export interface IncidentResponderRow {

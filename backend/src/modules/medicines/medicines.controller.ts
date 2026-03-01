@@ -17,6 +17,7 @@ import { MedicinesService } from './medicines.service';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateMedicineDto } from './dto/create-medicine.dto';
 import { UpdateMedicineDto } from './dto/update-medicine.dto';
 import { ListMedicinesDto } from './dto/list-medicines.dto';
@@ -130,8 +131,9 @@ export class MedicinesController {
   async addBatch(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AddBatchDto,
+    @CurrentUser('id') callerId: string,
   ) {
-    const data = await this.medicinesService.addBatch(id, dto);
+    const data = await this.medicinesService.addBatch(id, dto, callerId);
     return { success: true, data };
   }
 

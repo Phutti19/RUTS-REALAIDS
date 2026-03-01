@@ -18,6 +18,9 @@ export interface MedicineBatchRow {
   batch_number: string;
   quantity: number;
   expiry_date: Date;
+  received_at: Date;
+  received_by: string;
+  note: string | null;
   created_at: Date;
 }
 
@@ -27,7 +30,7 @@ export interface MedicineStockLogRow {
   batch_id: string | null;
   action: string;
   quantity_change: number;
-  notes: string | null;
+  note: string | null;
   created_at: Date;
 }
 

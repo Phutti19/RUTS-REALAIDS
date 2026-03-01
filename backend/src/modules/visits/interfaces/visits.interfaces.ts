@@ -21,7 +21,7 @@ export interface VisitRow {
   chief_complaint: string;
   diagnosis: string | null;
   vital_signs: VitalSigns | null;
-  treatment_notes: string | null;
+  treatment: string | null;
   status: string;
   created_at: Date;
   updated_at: Date;

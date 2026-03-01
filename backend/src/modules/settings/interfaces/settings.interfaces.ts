@@ -57,10 +57,9 @@ export interface DataBackupRow {
   id: string;
   filename: string;
   backup_type: BackupType;
-  file_size: string | null; // bigint returned as string by pg driver
-  file_path: string | null;
+  file_size_bytes: string | null; // bigint returned as string by pg driver
   status: BackupStatus;
-  created_by: string | null;
+  performed_by: string | null;
   created_at: Date;
 }
 

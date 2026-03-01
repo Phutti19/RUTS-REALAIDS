@@ -78,14 +78,17 @@ export class CertificatesService {
 
       const result = await client.query<CertificateRow>(
         `INSERT INTO medical_certificates
-           (visit_id, certificate_number, diagnosis_text, rest_days, issued_by)
-         VALUES ($1, $2, $3, $4, $5)
+           (visit_id, certificate_number, diagnosis_text, recommendation, rest_days, rest_start_date, rest_end_date, issued_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         [
           dto.visitId,
           certNumber,
           dto.diagnosisText,
+          dto.recommendation ?? null,
           dto.restDays ?? null,
+          dto.restStartDate ?? null,
+          dto.restEndDate ?? null,
           staffId,
         ],
       );
@@ -126,18 +129,18 @@ export class CertificatesService {
     }
 
     if (dto.from) {
-      conditions.push(`vc.created_at >= $${idx++}`);
+      conditions.push(`vc.issued_at >= $${idx++}`);
       values.push(dto.from);
     }
 
     if (dto.to) {
-      conditions.push(`vc.created_at <= $${idx++}`);
+      conditions.push(`vc.issued_at <= $${idx++}`);
       values.push(dto.to);
     }
 
     if (dto.search) {
       conditions.push(
-        `(vc.certificate_number ILIKE $${idx} OR vc.patient_first_name ILIKE $${idx} OR vc.patient_last_name ILIKE $${idx})`,
+        `(vc.certificate_number ILIKE $${idx} OR vc.patient_name ILIKE $${idx})`,
       );
       values.push(`%${dto.search}%`);
       idx++;
@@ -147,11 +150,11 @@ export class CertificatesService {
       conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const allowedSort: Record<string, string> = {
-      created_at: 'vc.created_at',
+      issued_at: 'vc.issued_at',
       certificate_number: 'vc.certificate_number',
     };
     const sortCol =
-      allowedSort[dto.sortBy ?? 'created_at'] ?? 'vc.created_at';
+      allowedSort[dto.sortBy ?? 'issued_at'] ?? 'vc.issued_at';
     const sortDir = dto.order === 'asc' ? 'ASC' : 'DESC';
 
     const countSql = `SELECT COUNT(*) FROM v_medical_certificates vc ${where}`;
@@ -349,24 +352,28 @@ export class CertificatesService {
   // ── Formatter ─────────────────────────────────────────────────────────────────
 
   private formatCertificate(row: CertificateViewRow): Certificate {
+    const [patientFirst = '', ...patientRest] = (row.patient_name ?? '').split(' ');
+    const patientLast = patientRest.join(' ');
+    const [issuerFirst = '', ...issuerRest] = (row.issued_by_name ?? '').split(' ');
+    const issuerLast = issuerRest.join(' ');
     return {
       id: row.id,
       visitId: row.visit_id,
       certificateNumber: row.certificate_number,
       diagnosisText: row.diagnosis_text,
       restDays: row.rest_days,
-      issuedAt: row.created_at,
+      issuedAt: row.issued_at,
       issuedBy: {
         id: row.issued_by,
-        firstName: row.issuer_first_name,
-        lastName: row.issuer_last_name,
+        firstName: issuerFirst,
+        lastName: issuerLast,
       },
       patient: {
         id: row.patient_id,
-        firstName: row.patient_first_name,
-        lastName: row.patient_last_name,
-        studentId: row.patient_student_id,
-        email: row.patient_email,
+        firstName: patientFirst,
+        lastName: patientLast,
+        studentId: row.student_id,
+        email: '',
       },
     };
   }

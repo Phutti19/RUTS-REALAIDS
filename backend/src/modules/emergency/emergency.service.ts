@@ -64,13 +64,6 @@ export class EmergencyService {
 
     if (!incident) throw new BadRequestException('Failed to create incident');
 
-    // Record initial status log
-    await this.db.execute(
-      `INSERT INTO incident_status_logs (incident_id, changed_by, old_status, new_status)
-       VALUES ($1, $2, NULL, 'pending')`,
-      [incident.id, reporterId],
-    );
-
     const detail = await this.getIncidentById(incident.id, reporterId, 'student');
 
     // Broadcast to all staff
@@ -239,9 +232,8 @@ export class EmergencyService {
       await client.query(
         `INSERT INTO incident_responders (incident_id, responder_id, accepted_at)
          VALUES ($1, $2, NOW())
-         ON CONFLICT (incident_id) DO UPDATE
-           SET responder_id = EXCLUDED.responder_id,
-               accepted_at  = EXCLUDED.accepted_at`,
+         ON CONFLICT (incident_id, responder_id) DO UPDATE
+           SET accepted_at = EXCLUDED.accepted_at`,
         [incidentId, staffId],
       );
 
@@ -342,10 +334,10 @@ export class EmergencyService {
 
   async getImages(incidentId: string): Promise<IncidentImage[]> {
     const rows = await this.db.queryMany<IncidentImageRow>(
-      `SELECT id, incident_id, image_url, created_at
+      `SELECT id, incident_id, image_url, uploaded_at
        FROM incident_images
        WHERE incident_id = $1
-       ORDER BY created_at ASC`,
+       ORDER BY uploaded_at ASC`,
       [incidentId],
     );
     return rows.map((r) => this.formatImage(r));
@@ -476,7 +468,7 @@ export class EmergencyService {
       id: row.id,
       incidentId: row.incident_id,
       imageUrl: row.image_url,
-      createdAt: row.created_at,
+      createdAt: row.uploaded_at,
     };
   }
 

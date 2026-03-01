@@ -215,7 +215,7 @@ export class MedicinesService {
    * Add a new stock batch.
    * Atomically: INSERT batch + UPDATE cached stock_quantity + INSERT stock_log(received)
    */
-  async addBatch(medicineId: string, dto: AddBatchDto): Promise<MedicineBatch> {
+  async addBatch(medicineId: string, dto: AddBatchDto, receivedBy: string): Promise<MedicineBatch> {
     await this.getMedicineById(medicineId); // throws NotFoundException if missing
 
     // Validate expiry date is in the future
@@ -227,27 +227,30 @@ export class MedicinesService {
     const batch = await this.db.transaction(async (client) => {
       // Insert batch
       const batchResult = await client.query<MedicineBatchRow>(
-        `INSERT INTO medicine_batches (medicine_id, batch_number, quantity, expiry_date)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO medicine_batches (medicine_id, batch_number, quantity, expiry_date, received_by)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [medicineId, dto.batchNumber, dto.quantity, dto.expiryDate],
+        [medicineId, dto.batchNumber, dto.quantity, dto.expiryDate, receivedBy],
       );
       const newBatch = batchResult.rows[0];
 
-      // Update cached medicine stock_quantity
-      await client.query(
-        `UPDATE medicines SET stock_quantity = stock_quantity + $1, updated_at = NOW() WHERE id = $2`,
+      // Update cached medicine stock_quantity, get new total
+      const stockResult = await client.query<{ stock_quantity: number }>(
+        `UPDATE medicines SET stock_quantity = stock_quantity + $1, updated_at = NOW() WHERE id = $2 RETURNING stock_quantity`,
         [dto.quantity, medicineId],
       );
+      const newStock = stockResult.rows[0].stock_quantity;
 
       // Record stock movement
       await client.query(
-        `INSERT INTO medicine_stock_logs (medicine_id, batch_id, action, quantity_change, notes)
-         VALUES ($1, $2, 'received', $3, $4)`,
+        `INSERT INTO medicine_stock_logs (medicine_id, batch_id, action, quantity_change, remaining_stock, performed_by, note)
+         VALUES ($1, $2, 'received', $3, $4, $5, $6)`,
         [
           medicineId,
           newBatch.id,
           dto.quantity,
+          newStock,
+          receivedBy,
           dto.notes ?? `Batch ${dto.batchNumber} received`,
         ],
       );
@@ -377,7 +380,7 @@ export class MedicinesService {
       batchId: row.batch_id,
       action: row.action,
       quantityChange: row.quantity_change,
-      notes: row.notes,
+      notes: row.note,
       createdAt: row.created_at,
     };
   }

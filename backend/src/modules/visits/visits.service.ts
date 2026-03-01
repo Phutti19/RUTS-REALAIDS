@@ -149,8 +149,8 @@ export class VisitsService {
     `;
     const dataSql = `
       SELECT pv.id, pv.patient_id, pv.staff_id, pv.incident_id, pv.visit_type,
-             pv.chief_complaint, pv.diagnosis, pv.vital_signs, pv.treatment_notes,
-             pv.status, pv.created_at, pv.updated_at,
+             pv.chief_complaint, pv.diagnosis, pv.vital_signs, pv.treatment,
+             pv.status, pv.created_at, COALESCE(pv.completed_at, pv.created_at) AS updated_at,
              u.first_name  AS patient_first_name,
              u.last_name   AS patient_last_name,
              u.email       AS patient_email,
@@ -186,8 +186,8 @@ export class VisitsService {
   ): Promise<Visit> {
     const row = await this.db.queryOne<VisitDetailRow>(
       `SELECT pv.id, pv.patient_id, pv.staff_id, pv.incident_id, pv.visit_type,
-              pv.chief_complaint, pv.diagnosis, pv.vital_signs, pv.treatment_notes,
-              pv.status, pv.created_at, pv.updated_at,
+              pv.chief_complaint, pv.diagnosis, pv.vital_signs, pv.treatment,
+              pv.status, pv.created_at, COALESCE(pv.completed_at, pv.created_at) AS updated_at,
               u.first_name  AS patient_first_name,
               u.last_name   AS patient_last_name,
               u.email       AS patient_email,
@@ -232,7 +232,7 @@ export class VisitsService {
       values.push(dto.diagnosis ?? null);
     }
     if (dto.treatmentNotes !== undefined) {
-      fields.push(`treatment_notes = $${idx++}`);
+      fields.push(`treatment = $${idx++}`);
       values.push(dto.treatmentNotes ?? null);
     }
     if (dto.vitalSigns !== undefined) {
@@ -246,7 +246,6 @@ export class VisitsService {
 
     if (fields.length === 0) return this.getVisitById(id, staffId, 'staff');
 
-    fields.push(`updated_at = NOW()`);
     values.push(id);
 
     await this.db.execute(
@@ -278,8 +277,8 @@ export class VisitsService {
   async getQueue(): Promise<QueueEntry[]> {
     const rows = await this.db.queryMany<VisitDetailRow>(
       `SELECT pv.id, pv.patient_id, pv.staff_id, pv.incident_id, pv.visit_type,
-              pv.chief_complaint, pv.diagnosis, pv.vital_signs, pv.treatment_notes,
-              pv.status, pv.created_at, pv.updated_at,
+              pv.chief_complaint, pv.diagnosis, pv.vital_signs, pv.treatment,
+              pv.status, pv.created_at, COALESCE(pv.completed_at, pv.created_at) AS updated_at,
               u.first_name  AS patient_first_name,
               u.last_name   AS patient_last_name,
               u.email       AS patient_email,
@@ -365,30 +364,33 @@ export class VisitsService {
         [dto.quantity, batch.id],
       );
 
-      // Update cached total on medicines
-      await client.query(
-        `UPDATE medicines SET stock_quantity = stock_quantity - $1, updated_at = NOW() WHERE id = $2`,
+      // Update cached total on medicines, get new total
+      const stockResult = await client.query<{ stock_quantity: number }>(
+        `UPDATE medicines SET stock_quantity = stock_quantity - $1, updated_at = NOW() WHERE id = $2 RETURNING stock_quantity`,
         [dto.quantity, dto.medicineId],
       );
+      const newStock = stockResult.rows[0].stock_quantity;
 
       // Record stock log
       await client.query(
-        `INSERT INTO medicine_stock_logs (medicine_id, batch_id, action, quantity_change, notes)
-         VALUES ($1, $2, 'dispensed', $3, $4)`,
+        `INSERT INTO medicine_stock_logs (medicine_id, batch_id, action, quantity_change, remaining_stock, performed_by, note)
+         VALUES ($1, $2, 'dispensed', $3, $4, $5, $6)`,
         [
           dto.medicineId,
           batch.id,
           -dto.quantity,
+          newStock,
+          staffId,
           `Dispensed for visit ${visitId}`,
         ],
       );
 
       // Insert visit_medication record
       const medResult = await client.query<QueryResultRow>(
-        `INSERT INTO visit_medications (visit_id, medicine_id, batch_id, quantity, dosage_instruction)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO visit_medications (visit_id, medicine_id, batch_id, quantity, dosage_instruction, dispensed_by)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, visit_id, medicine_id, batch_id, quantity, dosage_instruction, created_at`,
-        [visitId, dto.medicineId, batch.id, dto.quantity, dto.dosageInstruction ?? null],
+        [visitId, dto.medicineId, batch.id, dto.quantity, dto.dosageInstruction ?? null, staffId],
       );
 
       const med = medResult.rows[0];
@@ -498,7 +500,7 @@ export class VisitsService {
       chiefComplaint: row.chief_complaint,
       diagnosis: row.diagnosis,
       vitalSigns: row.vital_signs,
-      treatmentNotes: row.treatment_notes,
+      treatmentNotes: row.treatment,
       status: row.status,
       patient: {
         id: row.patient_id,

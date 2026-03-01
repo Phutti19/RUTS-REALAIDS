@@ -67,9 +67,9 @@ function formatBackup(row: DataBackupRow): DataBackup {
     id: row.id,
     filename: row.filename,
     backupType: row.backup_type,
-    fileSizeBytes: row.file_size !== null ? parseInt(row.file_size, 10) : null,
+    fileSizeBytes: row.file_size_bytes !== null ? parseInt(row.file_size_bytes, 10) : null,
     status: row.status,
-    createdBy: row.created_by,
+    createdBy: row.performed_by,
     createdAt: row.created_at,
   };
 }
@@ -304,9 +304,9 @@ export class SettingsService {
 
     const backupId = randomUUID();
     await this.db.execute(
-      `INSERT INTO data_backups (id, filename, backup_type, file_path, status, created_by)
-       VALUES ($1, $2, 'manual', $3, 'pending', $4)`,
-      [backupId, filename, filePath, createdBy],
+      `INSERT INTO data_backups (id, filename, backup_type, status, performed_by)
+       VALUES ($1, $2, 'manual', 'pending', $3)`,
+      [backupId, filename, createdBy],
     );
 
     const pgHost = this.config.get<string>('DATABASE_HOST', 'localhost');
@@ -325,7 +325,7 @@ export class SettingsService {
       const stat = fs.statSync(filePath);
       const row = await this.db.queryOne<DataBackupRow>(
         `UPDATE data_backups
-         SET status = 'completed', file_size = $1
+         SET status = 'completed', file_size_bytes = $1, completed_at = NOW()
          WHERE id = $2
          RETURNING *`,
         [stat.size, backupId],
@@ -345,7 +345,7 @@ export class SettingsService {
 
   async listBackups(): Promise<DataBackup[]> {
     const rows = await this.db.queryMany<DataBackupRow>(
-      `SELECT id, filename, backup_type, file_size, file_path, status, created_by, created_at
+      `SELECT id, filename, backup_type, file_size_bytes, status, performed_by, created_at
        FROM data_backups
        ORDER BY created_at DESC`,
     );
@@ -354,17 +354,20 @@ export class SettingsService {
 
   async downloadBackup(id: string): Promise<{ filename: string; buffer: Buffer }> {
     const row = await this.db.queryOne<DataBackupRow>(
-      `SELECT id, filename, file_path, status FROM data_backups WHERE id = $1`,
+      `SELECT id, filename, status FROM data_backups WHERE id = $1`,
       [id],
     );
     if (!row) throw new NotFoundException('Backup not found');
     if (row.status !== 'completed') {
       throw new BadRequestException(`Backup is not ready (status: ${row.status})`);
     }
-    if (!row.file_path || !fs.existsSync(row.file_path)) {
+    const backupDir =
+      this.config.get<string>('BACKUP_DIR') ?? path.join(process.cwd(), 'backups');
+    const filePath = path.join(backupDir, row.filename);
+    if (!fs.existsSync(filePath)) {
       throw new NotFoundException('Backup file not found on disk');
     }
-    const buffer = fs.readFileSync(row.file_path);
+    const buffer = fs.readFileSync(filePath);
     return { filename: row.filename, buffer };
   }
 

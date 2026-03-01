@@ -136,7 +136,7 @@ export class AppointmentsService {
        LEFT JOIN (
          SELECT slot_id, COUNT(*) AS booked_count
          FROM appointments
-         WHERE date = $1
+         WHERE appointment_date = $1
            AND status NOT IN ('cancelled', 'no_show')
          GROUP BY slot_id
        ) agg ON agg.slot_id = s.id
@@ -260,7 +260,7 @@ export class AppointmentsService {
     // Check duplicate: same patient, same slot, same date
     const duplicate = await this.db.queryOne<{ id: string }>(
       `SELECT id FROM appointments
-       WHERE patient_id = $1 AND slot_id = $2 AND date = $3
+       WHERE patient_id = $1 AND slot_id = $2 AND appointment_date = $3
          AND status NOT IN ('cancelled', 'no_show')`,
       [patientId, dto.slotId, dto.date],
     );
@@ -271,7 +271,7 @@ export class AppointmentsService {
     // Check capacity
     const capacityRow = await this.db.queryOne<{ booked_count: string }>(
       `SELECT COUNT(*)::text AS booked_count FROM appointments
-       WHERE slot_id = $1 AND date = $2 AND status NOT IN ('cancelled', 'no_show')`,
+       WHERE slot_id = $1 AND appointment_date = $2 AND status NOT IN ('cancelled', 'no_show')`,
       [dto.slotId, dto.date],
     );
     const bookedCount = parseInt(capacityRow?.booked_count ?? '0', 10);
@@ -282,10 +282,10 @@ export class AppointmentsService {
     // Create appointment + notification in one transaction
     const appointment = await this.db.transaction(async (client) => {
       const apptResult = await client.query<{ id: string }>(
-        `INSERT INTO appointments (patient_id, staff_id, slot_id, date, time, status, notes)
-         VALUES ($1, $2, $3, $4, $5, 'scheduled', $6)
+        `INSERT INTO appointments (patient_id, staff_id, slot_id, appointment_date, appointment_time, reason, status, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, 'scheduled', $7)
          RETURNING id`,
-        [patientId, slot.staff_id, dto.slotId, dto.date, slot.start_time, dto.notes ?? null],
+        [patientId, slot.staff_id, dto.slotId, dto.date, slot.start_time, dto.notes ?? '', dto.notes ?? null],
       );
       const apptId = apptResult.rows[0].id;
 
@@ -345,7 +345,7 @@ export class AppointmentsService {
     }
 
     if (dto.date) {
-      conditions.push(`a.date = $${idx++}`);
+      conditions.push(`a.appointment_date = $${idx++}`);
       values.push(dto.date);
     }
     if (dto.status) {
@@ -356,11 +356,11 @@ export class AppointmentsService {
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const allowedSort: Record<string, string> = {
-      date: 'a.date',
+      date: 'a.appointment_date',
       created_at: 'a.created_at',
       status: 'a.status',
     };
-    const sortCol = allowedSort[dto.sortBy ?? 'date'] ?? 'a.date';
+    const sortCol = allowedSort[dto.sortBy ?? 'date'] ?? 'a.appointment_date';
     const sortDir = dto.order === 'desc' ? 'DESC' : 'ASC';
 
     const joinSql = `
@@ -422,8 +422,8 @@ export class AppointmentsService {
        JOIN users p  ON p.id  = a.patient_id
        JOIN users st ON st.id = a.staff_id
        JOIN appointment_slots sl ON sl.id = a.slot_id
-       WHERE a.date = CURRENT_DATE
-       ORDER BY a.time ASC, a.status ASC`,
+       WHERE a.appointment_date = CURRENT_DATE
+       ORDER BY a.appointment_time ASC, a.status ASC`,
     );
     return rows.map((r) => this.formatAppointment(r));
   }
@@ -570,8 +570,8 @@ export class AppointmentsService {
       patientId: row.patient_id,
       staffId: row.staff_id,
       slotId: row.slot_id,
-      date: typeof row.date === 'string' ? row.date : (row.date as Date).toISOString().split('T')[0],
-      time: row.time,
+      date: typeof row.appointment_date === 'string' ? row.appointment_date : (row.appointment_date as Date).toISOString().split('T')[0],
+      time: row.appointment_time,
       status: row.status,
       cancelReason: row.cancel_reason,
       notes: row.notes,

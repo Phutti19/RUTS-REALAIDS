@@ -3,6 +3,7 @@ import {
   IsString,
   IsOptional,
   IsInt,
+  IsDateString,
   MaxLength,
   Min,
   Max,
@@ -21,6 +22,12 @@ export class CreateCertificateDto {
   @Transform(({ value }: { value: string }) => value?.trim())
   diagnosisText: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  @Transform(({ value }: { value: string }) => value?.trim() || null)
+  recommendation?: string | null;
+
   /** Recommended rest days (0 = no rest required, null = not specified) */
   @IsOptional()
   @Type(() => Number)
@@ -28,4 +35,12 @@ export class CreateCertificateDto {
   @Min(0)
   @Max(365)
   restDays?: number | null;
+
+  @IsOptional()
+  @IsDateString()
+  restStartDate?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  restEndDate?: string | null;
 }

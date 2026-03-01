@@ -18,6 +18,21 @@
 #   แล้วเปิดไฟล์นี้ → จะเห็นปุ่ม "Send Request" เหนือแต่ละ request
 #
 
+# =============================================
+# SETUP: สร้าง admin คนแรก (ทำครั้งเดียว)
+# =============================================
+#
+# /auth/register hardcode role='student' เสมอ (ป้องกัน privilege escalation)
+# วิธีสร้าง admin/staff:
+#
+#  STEP 1 — Register ด้วย 1.1 ก่อน (จะเป็น student)
+#  STEP 2 — Upgrade role ใน PostgreSQL:
+#
+#    UPDATE users SET role = 'admin'
+#    WHERE email = 'admin@ruts.ac.th';
+#
+#  STEP 3 — Login ด้วย admin (1.4) → เอา adminToken ไปสร้าง staff ผ่าน 10.4
+#
 
 # =============================================
 # VARIABLES
@@ -36,7 +51,9 @@
 # ทดสอบ: register, login, refresh, logout, password reset
 ###################################################################
 
-### 1.1 Register — สร้าง admin user (ใช้ทดสอบ)
+### 1.1 Register — สร้าง user ที่จะ upgrade เป็น admin
+# ⚠️  /auth/register ไม่รับ field "role" (forbidNonWhitelisted=true → 400)
+# หลัง register แล้ว run SQL: UPDATE users SET role='admin' WHERE email='admin@ruts.ac.th'
 POST {{baseUrl}}/auth/register
 Content-Type: {{contentType}}
 
@@ -45,11 +62,11 @@ Content-Type: {{contentType}}
   "password": "Admin@1234",
   "firstName": "Admin",
   "lastName": "System",
-  "phone": "0812345678",
-  "role": "admin"
+  "phone": "0812345678"
 }
 
-### 1.2 Register — สร้าง staff user
+### 1.2 Register — student ที่จะ upgrade เป็น staff
+# (หรือ admin สร้างให้ผ่าน POST /admin/users ข้อ 10.4 ซึ่งสะดวกกว่า)
 POST {{baseUrl}}/auth/register
 Content-Type: {{contentType}}
 
@@ -58,11 +75,10 @@ Content-Type: {{contentType}}
   "password": "Nurse@1234",
   "firstName": "Somchai",
   "lastName": "Jaidee",
-  "phone": "0823456789",
-  "role": "staff"
+  "phone": "0823456789"
 }
 
-### 1.3 Register — สร้าง student user
+### 1.3 Register — student user (ปกติ ใช้งานได้ทันที)
 POST {{baseUrl}}/auth/register
 Content-Type: {{contentType}}
 
@@ -72,13 +88,11 @@ Content-Type: {{contentType}}
   "firstName": "Somsri",
   "lastName": "Meesuk",
   "phone": "0834567890",
-  "role": "student",
   "studentId": "6510001"
 }
 
 ### 1.4 Login — admin
 # ✅ ต้องได้: accessToken + refreshToken
-# ❌ ผิด: 401 Unauthorized
 POST {{baseUrl}}/auth/login
 Content-Type: {{contentType}}
 
@@ -148,7 +162,6 @@ Content-Type: {{contentType}}
 ###################################################################
 
 ### 2.1 Get My Profile (student)
-# ✅ ต้องได้: ข้อมูล user ปัจจุบัน
 GET {{baseUrl}}/users/me
 Authorization: {{studentToken}}
 
@@ -182,8 +195,7 @@ GET {{baseUrl}}/users/me/health-profile
 Authorization: {{studentToken}}
 
 ### 2.5 List All Users (admin only)
-# ✅ admin: ต้องได้ list + pagination
-# ❌ student: ต้องได้ 403 Forbidden
+# ✅ admin: list + pagination | ❌ student: 403
 GET {{baseUrl}}/users?page=1&limit=10
 Authorization: {{adminToken}}
 
@@ -194,11 +206,10 @@ Authorization: {{studentToken}}
 
 ###################################################################
 # MODULE 3: EMERGENCY INCIDENTS
-# ทดสอบ: แจ้งเหตุ, รับเหตุ, เปลี่ยนสถานะ, รูปภาพ
+# ทดสอบ: แจ้งเหตุ, รับเหตุ, เปลี่ยนสถานะ
 ###################################################################
 
 ### 3.1 Report Emergency (student)
-# ✅ ต้องได้: incident object + status=pending
 POST {{baseUrl}}/incidents
 Authorization: {{studentToken}}
 Content-Type: {{contentType}}
@@ -227,7 +238,6 @@ Content-Type: {{contentType}}
 }
 
 ### 3.3 List Incidents (staff)
-# ✅ ต้องได้: list ทั้งหมด
 GET {{baseUrl}}/incidents?page=1&limit=10
 Authorization: {{staffToken}}
 
@@ -236,12 +246,10 @@ GET {{baseUrl}}/incidents?status=pending
 Authorization: {{staffToken}}
 
 ### 3.5 Get Single Incident
-# แทน :id ด้วย UUID จาก step 3.1
 GET {{baseUrl}}/incidents/<incident-id>
 Authorization: {{staffToken}}
 
 ### 3.6 Accept Incident (staff)
-# ✅ ต้อง: status เปลี่ยนเป็น accepted + สร้าง incident_responder + status_log
 POST {{baseUrl}}/incidents/<incident-id>/accept
 Authorization: {{staffToken}}
 
@@ -266,7 +274,6 @@ Content-Type: {{contentType}}
 }
 
 ### 3.9 Get Status Logs (audit trail)
-# ✅ ต้องเห็น: pending→accepted→in_progress→completed
 GET {{baseUrl}}/incidents/<incident-id>/logs
 Authorization: {{staffToken}}
 
@@ -277,7 +284,6 @@ Authorization: {{studentToken}}
 
 ###################################################################
 # MODULE 4: PATIENT VISITS
-# ทดสอบ: สร้าง visit, จ่ายยา, คิว
 ###################################################################
 
 ### 4.1 Get Queue (waiting patients)
@@ -285,7 +291,6 @@ GET {{baseUrl}}/visits/queue
 Authorization: {{staffToken}}
 
 ### 4.2 Create Visit (staff)
-# ✅ สร้าง visit ใหม่ เชื่อมกับ incident (optional)
 POST {{baseUrl}}/visits
 Authorization: {{staffToken}}
 Content-Type: {{contentType}}
@@ -307,7 +312,7 @@ Content-Type: {{contentType}}
 GET {{baseUrl}}/visits/<visit-id>
 Authorization: {{staffToken}}
 
-### 4.4 Update Visit — add diagnosis + treatment
+### 4.4 Update Visit — add diagnosis
 PATCH {{baseUrl}}/visits/<visit-id>
 Authorization: {{staffToken}}
 Content-Type: {{contentType}}
@@ -315,12 +320,11 @@ Content-Type: {{contentType}}
 {
   "diagnosis": "Sprained left ankle, grade 1",
   "treatment": "Cold compress, bandage, pain medication",
-  "treatmentTypeId": "<treatment-type-id>",
   "status": "in_treatment"
 }
 
 ### 4.5 Dispense Medication
-# ✅ ต้อง: สร้าง visit_medication + ตัด stock อัตโนมัติ + สร้าง stock_log
+# ✅ ต้อง: ตัด stock อัตโนมัติ + สร้าง stock_log
 POST {{baseUrl}}/visits/<visit-id>/medications
 Authorization: {{staffToken}}
 Content-Type: {{contentType}}
@@ -338,8 +342,7 @@ Authorization: {{staffToken}}
 Content-Type: {{contentType}}
 
 {
-  "status": "completed",
-  "notes": "Patient advised to rest for 2 days"
+  "status": "completed"
 }
 
 ### 4.7 List Visits with filter
@@ -352,7 +355,7 @@ Authorization: {{staffToken}}
 ###################################################################
 
 ### 5.1 Create Certificate
-# ✅ ต้อง: auto-generate certificate_number (CERT-2025-000001)
+# ✅ auto-generate certificate_number (CERT-2025-000001)
 POST {{baseUrl}}/certificates
 Authorization: {{staffToken}}
 Content-Type: {{contentType}}
@@ -375,7 +378,6 @@ GET {{baseUrl}}/certificates/<certificate-id>
 Authorization: {{staffToken}}
 
 ### 5.4 Export PDF
-# ✅ ต้องได้: ไฟล์ PDF download
 GET {{baseUrl}}/certificates/<certificate-id>/pdf
 Authorization: {{staffToken}}
 
@@ -391,7 +393,6 @@ Content-Type: {{contentType}}
 
 {
   "name": "Paracetamol 500mg",
-  "genericName": "Paracetamol",
   "category": "medicine",
   "unit": "tablet",
   "description": "Pain reliever and fever reducer",
@@ -411,7 +412,6 @@ Content-Type: {{contentType}}
 }
 
 ### 6.3 Add Batch (receive stock)
-# ✅ ต้อง: สร้าง batch + อัปเดต medicines.stock_quantity + สร้าง stock_log
 POST {{baseUrl}}/medicines/<medicine-id>/batches
 Authorization: {{staffToken}}
 Content-Type: {{contentType}}
@@ -423,7 +423,7 @@ Content-Type: {{contentType}}
   "note": "Received from supplier"
 }
 
-### 6.4 Add Another Batch (different expiry)
+### 6.4 Add Near-expiry Batch
 POST {{baseUrl}}/medicines/<medicine-id>/batches
 Authorization: {{staffToken}}
 Content-Type: {{contentType}}
@@ -439,7 +439,7 @@ Content-Type: {{contentType}}
 GET {{baseUrl}}/medicines?page=1&limit=10
 Authorization: {{staffToken}}
 
-### 6.6 Get Medicine Detail + Batches
+### 6.6 Get Medicine Detail
 GET {{baseUrl}}/medicines/<medicine-id>
 Authorization: {{staffToken}}
 
@@ -452,12 +452,10 @@ GET {{baseUrl}}/medicines/<medicine-id>/stock-logs
 Authorization: {{staffToken}}
 
 ### 6.9 Low Stock Alert
-# ✅ ต้องแสดงยาที่ stock <= min_stock_level
 GET {{baseUrl}}/medicines/alerts/low-stock
 Authorization: {{staffToken}}
 
 ### 6.10 Expiring Soon Alert
-# ✅ ต้องแสดง batch ที่หมดอายุใน 30 วัน
 GET {{baseUrl}}/medicines/alerts/expiring
 Authorization: {{staffToken}}
 
@@ -479,7 +477,7 @@ Content-Type: {{contentType}}
   "maxPatientsPerSlot": 2
 }
 
-### 7.2 Create Another Slot
+### 7.2 Create Another Slot (Wednesday)
 POST {{baseUrl}}/appointment-slots
 Authorization: {{staffToken}}
 Content-Type: {{contentType}}
@@ -525,7 +523,7 @@ Authorization: {{staffToken}}
 PATCH {{baseUrl}}/appointments/<appointment-id>/complete
 Authorization: {{staffToken}}
 
-### 7.9 Cancel Appointment
+### 7.9 Cancel Appointment (student)
 PATCH {{baseUrl}}/appointments/<appointment-id>/cancel
 Authorization: {{studentToken}}
 Content-Type: {{contentType}}
@@ -591,7 +589,7 @@ Authorization: {{adminToken}}
 
 ### 10.2 Get Infirmary Info
 GET {{baseUrl}}/settings/infirmary
-Authorization: {{staffToken}}
+Authorization: {{adminToken}}
 
 ### 10.3 Update Setting
 PUT {{baseUrl}}/settings/infirmary_phone
@@ -602,23 +600,47 @@ Content-Type: {{contentType}}
   "value": "074-317200"
 }
 
-### 10.4 List Users (admin)
+### 10.4 Create Staff/Admin User (admin เท่านั้น)
+# ✅ ใช้ endpoint นี้แทน /auth/register สำหรับสร้าง staff/admin
+POST {{baseUrl}}/admin/users
+Authorization: {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "email": "nurse2@ruts.ac.th",
+  "password": "Nurse@1234",
+  "firstName": "Malee",
+  "lastName": "Srisuk",
+  "phone": "0845678901",
+  "role": "staff"
+}
+
+### 10.5 List Users (admin)
 GET {{baseUrl}}/admin/users?page=1&limit=10&role=student
 Authorization: {{adminToken}}
 
-### 10.5 Deactivate User
+### 10.6 Update User
+PUT {{baseUrl}}/admin/users/<user-id>
+Authorization: {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "phone": "0899000001"
+}
+
+### 10.7 Deactivate User
 PATCH {{baseUrl}}/admin/users/<user-id>/deactivate
 Authorization: {{adminToken}}
 
-### 10.6 Activate User
+### 10.8 Activate User
 PATCH {{baseUrl}}/admin/users/<user-id>/activate
 Authorization: {{adminToken}}
 
-### 10.7 Get Emergency Contacts
+### 10.9 Get Emergency Contacts
 GET {{baseUrl}}/emergency-contacts
 Authorization: {{staffToken}}
 
-### 10.8 Create Emergency Contact
+### 10.10 Create Emergency Contact
 POST {{baseUrl}}/emergency-contacts
 Authorization: {{adminToken}}
 Content-Type: {{contentType}}
@@ -627,18 +649,32 @@ Content-Type: {{contentType}}
   "name": "Songklanagarind Hospital",
   "category": "hospital",
   "phone": "074-451999",
-  "address": "15 Kanjanavanit Rd, Hat Yai",
-  "latitude": 7.0048,
-  "longitude": 100.4736,
-  "isPrimary": false
+  "note": "15 Kanjanavanit Rd, Hat Yai — nearest hospital"
 }
 
-### 10.9 Create Backup
+### 10.11 Update Emergency Contact
+PUT {{baseUrl}}/emergency-contacts/<contact-id>
+Authorization: {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "phone": "074-451000"
+}
+
+### 10.12 Delete Emergency Contact
+DELETE {{baseUrl}}/emergency-contacts/<contact-id>
+Authorization: {{adminToken}}
+
+### 10.13 Create Backup (requires pg_dump in PATH)
 POST {{baseUrl}}/backups
 Authorization: {{adminToken}}
 
-### 10.10 List Backups
+### 10.14 List Backups
 GET {{baseUrl}}/backups
+Authorization: {{adminToken}}
+
+### 10.15 Download Backup
+GET {{baseUrl}}/backups/<backup-id>/download
 Authorization: {{adminToken}}
 
 
@@ -654,35 +690,56 @@ GET {{baseUrl}}/users/me
 Authorization: Bearer invalid-token-here
 
 ### S.3 Expired Token — ต้อง 401
-# ใช้ token เก่าที่หมดอายุแล้ว
 GET {{baseUrl}}/users/me
 Authorization: Bearer <expired-token>
 
-### S.4 Student access staff route — ต้อง 403
+### S.4 Student access admin route — ต้อง 403
 GET {{baseUrl}}/admin/users
 Authorization: {{studentToken}}
 
-### S.5 Staff access admin route — ต้อง 403
+### S.5 Staff access admin-only route — ต้อง 403
 POST {{baseUrl}}/backups
 Authorization: {{staffToken}}
 
-### S.6 Brute Force — login ผิด 6 ครั้ง ต้อง lock
-# รัน 1.5 (wrong password) 6 ครั้ง ติดต่อกัน
-# ครั้งที่ 6 ต้องได้: 429 Too Many Requests หรือ Account Locked
+### S.6 Extra field in body — ต้อง 400 (forbidNonWhitelisted)
+# ⚠️  นี่คือ bug เดิม: ส่ง "role" ใน /auth/register → 400
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "test@ruts.ac.th",
+  "password": "Test@1234",
+  "firstName": "Test",
+  "lastName": "User",
+  "role": "admin"
+}
+
+### S.7 Brute Force — login ผิด 6 ครั้ง ต้อง lock
+# รัน S.8 ซ้ำ 6 ครั้ง → ครั้งที่ 6 ต้องได้ "Account locked"
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "admin@ruts.ac.th",
+  "password": "wrongpassword"
+}
 
 
 ###################################################################
 # WEBSOCKET TEST
 ###################################################################
 #
-# เปิด browser console หรือใช้ wscat:
+# เปิด terminal แล้วรัน:
 #   npm install -g wscat
-#   wscat -c ws://localhost:4000
+#   wscat -c "ws://localhost:4000?token=<access-token>"
 #
-# หลัง connect ส่ง auth:
-#   {"event":"auth","data":{"token":"<access-token>"}}
+# หลัง connect จะได้ event: {"event":"connected","data":{...}}
 #
-# แล้วลอง:
+# Ping test:
+#   {"event":"ping","data":{}}
+#   → ต้องได้: {"event":"pong","data":{"ts":...}}
+#
+# ทดสอบ Real-time:
 #   1. เปิด 2 terminals (1=student, 1=staff)
 #   2. Student แจ้งเหตุผ่าน API (step 3.1)
 #   3. Staff terminal ต้องได้รับ event: incident:new

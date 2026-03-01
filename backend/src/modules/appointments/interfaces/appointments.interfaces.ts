@@ -28,8 +28,8 @@ export interface AppointmentRow {
   patient_id: string;
   staff_id: string;
   slot_id: string;
-  date: string; // DATE column → string in ISO format "YYYY-MM-DD"
-  time: string; // TIME column → e.g. "09:00:00"
+  appointment_date: string; // DATE column → string in ISO format "YYYY-MM-DD"
+  appointment_time: string; // TIME column → e.g. "09:00:00"
   status: string;
   cancel_reason: string | null;
   notes: string | null;

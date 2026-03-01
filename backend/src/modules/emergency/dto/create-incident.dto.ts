@@ -37,4 +37,10 @@ export class CreateIncidentDto {
   @Min(-180)
   @Max(180)
   longitude?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @Transform(({ value }: { value: string }) => value?.trim() || null)
+  locationName?: string | null;
 }
