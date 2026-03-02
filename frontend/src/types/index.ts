@@ -201,7 +201,9 @@ export interface AppointmentSlot {
   id: string;
   staffId: string;
   staffName: string;
-  dayOfWeek: DayOfWeek;
+  /** 0=Sunday, 1=Monday … 6=Saturday */
+  dayOfWeek: number;
+  dayName?: string;
   startTime: string;
   endTime: string;
   slotDurationMinutes: number;
@@ -246,26 +248,23 @@ export interface Notification {
 // ── Reports ───────────────────────────────────────────────────────────────────
 
 export interface DashboardReport {
-  incidents: {
+  generatedAt: string;
+  incidentsToday: {
     total: number;
-    pending: number;
-    inProgress: number;
-    completed: number;
+    byStatus: Record<string, number>;
+    avgResponseTimeMinutes: number | null;
   };
-  visits: {
+  visitsToday: {
     total: number;
-    waiting: number;
-    inTreatment: number;
   };
-  medicines: {
+  medicinesAlerts: {
     lowStockCount: number;
-    expiringCount: number;
+    expiringSoonCount: number;
   };
-  appointments: {
+  appointmentsToday: {
     total: number;
-    checkedIn: number;
+    byStatus: Record<string, number>;
   };
-  avgResponseTimeMinutes: number | null;
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
