@@ -50,8 +50,11 @@ export default function SlotsPage() {
   const [slotDuration, setSlotDuration] = useState(30);
 
   const load = () => {
-    api.get<AppointmentSlot[]>("/appointment-slots").then((res) => {
-      if (res.success && res.data) setSlots(Array.isArray(res.data) ? res.data : []);
+    api.get<unknown>("/appointment-slots").then((res) => {
+      if (res.success && res.data) {
+        const payload = res.data as { data: AppointmentSlot[] };
+        setSlots(Array.isArray(payload.data) ? payload.data : []);
+      }
       setLoading(false);
     });
   };

@@ -10,9 +10,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 interface PatientVisit {
   id: string;
   patientId: string;
-  patientFirstName: string;
-  patientLastName: string;
-  patientStudentId: string | null;
+  patient: { firstName: string; lastName: string; studentId: string | null };
   chiefComplaint: string;
   visitType: string;
   status: string;
@@ -126,8 +124,8 @@ export default function PatientsPage() {
                 <tr key={v.id} className="hover:bg-gray-50/60 transition-colors">
                   <td className="px-4 py-3 text-xs text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-gray-800">{v.patientFirstName} {v.patientLastName}</p>
-                    {v.patientStudentId && <p className="text-xs text-gray-400">{v.patientStudentId}</p>}
+                    <p className="font-medium text-gray-800">{v.patient.firstName} {v.patient.lastName}</p>
+                    {v.patient.studentId && <p className="text-xs text-gray-400">{v.patient.studentId}</p>}
                   </td>
                   <td className="px-4 py-3 max-w-[200px]">
                     <p className="text-gray-700 truncate">{v.chiefComplaint}</p>

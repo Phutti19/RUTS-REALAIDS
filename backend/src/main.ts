@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -15,6 +16,9 @@ async function bootstrap() {
 
   // ── Security headers ──
   app.use(helmet());
+
+  // ── Cookie parser (required for httpOnly refresh token cookies) ──
+  app.use(cookieParser());
 
   // ── HTTP request logging ──
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));

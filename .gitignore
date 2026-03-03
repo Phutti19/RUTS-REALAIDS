@@ -101,3 +101,8 @@ public/uploads/
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Playwright E2E
+playwright-report/
+test-results/
+e2e/.auth/

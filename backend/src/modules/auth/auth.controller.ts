@@ -5,18 +5,28 @@ import {
   HttpCode,
   HttpStatus,
   Req,
+  Res,
   UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 
 import { AuthService } from './auth.service';
 import { AuthGuard } from '../../common/guards/auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+
+const REFRESH_COOKIE = 'refresh_token';
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  maxAge: COOKIE_MAX_AGE,
+  path: '/',
+};
 
 @Controller('auth')
 export class AuthController {
@@ -24,17 +34,22 @@ export class AuthController {
 
   /**
    * POST /api/v1/auth/login
-   * Returns: { success, data: { accessToken, refreshToken, user } }
+   * Sets refresh token as httpOnly cookie; returns { accessToken, user }.
    *
    * Tracks login attempts per email+IP.
    * Locks account after 5 failures within 15 minutes.
    */
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto, @Req() req: Request) {
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const ipAddress = this.extractIp(req);
-    const data = await this.authService.login(dto, ipAddress);
-    return { success: true, data };
+    const { accessToken, refreshToken, user } = await this.authService.login(dto, ipAddress);
+    res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
+    return { success: true, data: { accessToken, user } };
   }
 
   /**
@@ -51,29 +66,36 @@ export class AuthController {
 
   /**
    * POST /api/v1/auth/refresh
-   * Exchange a valid refresh token for a new access token.
-   * Refresh token itself is NOT rotated — client keeps the same one until logout.
+   * Reads refresh token from httpOnly cookie; returns a new access token.
    */
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Body() dto: RefreshTokenDto) {
-    const data = await this.authService.refresh(dto.refreshToken);
+  async refresh(@Req() req: Request & { cookies: Record<string, string> }) {
+    const refreshToken = req.cookies?.[REFRESH_COOKIE];
+    if (!refreshToken) {
+      throw new UnauthorizedException('No refresh token');
+    }
+    const data = await this.authService.refresh(refreshToken);
     return { success: true, data };
   }
 
   /**
    * POST /api/v1/auth/logout
-   * Revokes the refresh token in the database.
+   * Revokes the refresh token in the database and clears the cookie.
    * Requires a valid access token in the Authorization header.
    */
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard)
   async logout(
-    @Body() dto: RefreshTokenDto,
-    @CurrentUser('id') userId: string,
+    @Req() req: Request & { cookies: Record<string, string> },
+    @Res({ passthrough: true }) res: Response,
   ) {
-    await this.authService.logout(dto.refreshToken);
+    const refreshToken = req.cookies?.[REFRESH_COOKIE];
+    if (refreshToken) {
+      await this.authService.logout(refreshToken);
+    }
+    res.clearCookie(REFRESH_COOKIE, { path: '/' });
     return { success: true, message: 'Logged out successfully' };
   }
 

@@ -22,12 +22,6 @@ import { cn, formatDateTime, statusLabel } from "@/lib/utils";
 import type { Visit, VisitMedication, HealthProfile, VitalSigns, Medicine } from "@/types";
 
 interface VisitDetail extends Visit {
-  patientFirstName: string;
-  patientLastName: string;
-  patientStudentId: string | null;
-  patientEmail: string;
-  staffFirstName: string;
-  staffLastName: string;
   medications: VisitMedication[];
 }
 
@@ -66,7 +60,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
       const v = visitRes.data;
       setVisit(v);
       setDiagnosis(v.diagnosis ?? "");
-      setTreatment(v.treatment ?? "");
+      setTreatment(v.treatmentNotes ?? "");
       setVitalSigns(v.vitalSigns ?? {});
       // Load patient health profile
       api.get<HealthProfile>(`/users/${v.patientId}/health-profile`).then((r) => {
@@ -85,7 +79,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
   const saveVisit = async () => {
     setSavingVisit(true);
     setVisitMsg(null);
-    const res = await api.patch(`/visits/${id}`, { diagnosis, treatment, vitalSigns });
+    const res = await api.patch(`/visits/${id}`, { diagnosis, treatmentNotes: treatment, vitalSigns });
     setSavingVisit(false);
     setVisitMsg(res.success ? { type: "ok", text: "บันทึกสำเร็จ" } : { type: "err", text: res.message ?? "เกิดข้อผิดพลาด" });
   };
@@ -114,7 +108,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
   const completeVisit = async () => {
     if (!confirm("ยืนยันสรุปการรักษา?")) return;
     setCompleting(true);
-    const res = await api.patch(`/visits/${id}/complete`);
+    const res = await api.patch(`/visits/${id}`, { status: "completed" });
     setCompleting(false);
     if (res.success) {
       setVisit((prev) => prev ? { ...prev, status: "completed" } : prev);
@@ -159,10 +153,10 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
         </Link>
         <div className="flex-1">
           <h1 className="text-xl font-bold text-gray-900">
-            {visit.patientFirstName} {visit.patientLastName}
+            {visit.patient.firstName} {visit.patient.lastName}
           </h1>
           <p className="text-sm text-gray-500">
-            {visit.patientStudentId} · {formatDateTime(visit.createdAt)}
+            {visit.patient.studentId} · {formatDateTime(visit.createdAt)}
           </p>
         </div>
         <StatusBadge status={visit.status} />
@@ -196,9 +190,9 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
               <h2 className="text-sm font-semibold text-gray-700">ข้อมูลผู้ป่วย</h2>
             </div>
             <div className="space-y-1.5 text-sm">
-              <InfoRow label="ชื่อ" value={`${visit.patientFirstName} ${visit.patientLastName}`} />
-              <InfoRow label="รหัสนักศึกษา" value={visit.patientStudentId ?? "—"} />
-              <InfoRow label="อีเมล" value={visit.patientEmail} />
+              <InfoRow label="ชื่อ" value={`${visit.patient.firstName} ${visit.patient.lastName}`} />
+              <InfoRow label="รหัสนักศึกษา" value={visit.patient.studentId ?? "—"} />
+              <InfoRow label="อีเมล" value={visit.patient.email} />
             </div>
           </div>
 
@@ -225,7 +219,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
                   <InfoRow label="โรคประจำตัว" value={health.chronicDiseases} />
                 )}
                 {health.emergencyContact && (
-                  <InfoRow label="ผู้ติดต่อ" value={`${health.emergencyContact} ${health.emergencyPhone ?? ""}`} />
+                  <InfoRow label="ผู้ติดต่อ" value={`${health.emergencyContact.name ?? ""} ${health.emergencyContact.phone ?? ""}`.trim()} />
                 )}
               </div>
             </div>

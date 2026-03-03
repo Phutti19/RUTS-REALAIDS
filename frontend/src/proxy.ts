@@ -1,44 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { jwtVerify } from "jose";
-
-const JWT_SECRET = process.env.JWT_SECRET ?? "change-me-in-production";
 
 const PUBLIC_PATHS = ["/login", "/forgot-password"];
+const REFRESH_COOKIE = "refresh_token";
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 }
 
-export async function proxy(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isPublic(pathname) || pathname === "/") {
     return NextResponse.next();
   }
 
-  // Route protection uses access_token cookie set after login
-  const tokenCookie = request.cookies.get("access_token")?.value;
+  // Presence of httpOnly refresh_token cookie indicates a valid session.
+  // Role-based routing is enforced client-side in each portal layout.
+  const hasSession = request.cookies.has(REFRESH_COOKIE);
 
-  if (!tokenCookie) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (!hasSession) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  try {
-    const secret = new TextEncoder().encode(JWT_SECRET);
-    const { payload } = await jwtVerify(tokenCookie, secret);
-    const role = payload.role as string;
-
-    if (pathname.startsWith("/student") && role !== "student") {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-    if (pathname.startsWith("/staff") && role !== "staff" && role !== "admin") {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-
-    return NextResponse.next();
-  } catch {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
+  return NextResponse.next();
 }
 
 export const config = {

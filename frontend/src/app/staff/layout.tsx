@@ -15,7 +15,7 @@ import {
   X,
   Bell,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useAuthContext } from "@/contexts/AuthContext";
 
@@ -36,8 +36,15 @@ export default function StaffLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuthContext();
+  const { user, isLoading, logout } = useAuthContext();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Redirect if not staff/admin after auth resolves
+  useEffect(() => {
+    if (!isLoading && user && user.role === "student") {
+      router.replace("/student/dashboard");
+    }
+  }, [isLoading, user, router]);
 
   const handleLogout = async () => {
     await logout();

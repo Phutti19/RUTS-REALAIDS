@@ -53,8 +53,8 @@ export default function StudentProfilePage() {
         setBloodType(h.bloodType ?? "");
         setAllergies(h.allergies ?? "");
         setChronicDiseases(h.chronicDiseases ?? "");
-        setEmergencyContact(h.emergencyContact ?? "");
-        setEmergencyPhone(h.emergencyPhone ?? "");
+        setEmergencyContact(h.emergencyContact?.name ?? "");
+        setEmergencyPhone(h.emergencyContact?.phone ?? "");
       }
       setLoadingHealth(false);
     });
@@ -80,8 +80,8 @@ export default function StudentProfilePage() {
       bloodType: bloodType || null,
       allergies: allergies.trim() || null,
       chronicDiseases: chronicDiseases.trim() || null,
-      emergencyContact: emergencyContact.trim() || null,
-      emergencyPhone: emergencyPhone.trim() || null,
+      emergencyContactName: emergencyContact.trim() || null,
+      emergencyContactPhone: emergencyPhone.trim() || null,
     });
     setSavingHealth(false);
     if (res.success) {
@@ -356,8 +356,8 @@ export default function StudentProfilePage() {
                 </div>
                 <InfoRow label="ยาที่แพ้" value={health?.allergies ?? "ไม่มี"} />
                 <InfoRow label="โรคประจำตัว" value={health?.chronicDiseases ?? "ไม่มี"} />
-                <InfoRow label="ผู้ติดต่อฉุกเฉิน" value={health?.emergencyContact ?? "ยังไม่ระบุ"} />
-                <InfoRow label="เบอร์ฉุกเฉิน" value={health?.emergencyPhone ?? "ยังไม่ระบุ"} />
+                <InfoRow label="ผู้ติดต่อฉุกเฉิน" value={health?.emergencyContact?.name ?? "ยังไม่ระบุ"} />
+                <InfoRow label="เบอร์ฉุกเฉิน" value={health?.emergencyContact?.phone ?? "ยังไม่ระบุ"} />
               </div>
             )}
           </div>

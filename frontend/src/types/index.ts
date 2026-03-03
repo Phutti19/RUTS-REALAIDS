@@ -35,8 +35,12 @@ export interface HealthProfile {
   bloodType: string | null;
   allergies: string | null;
   chronicDiseases: string | null;
-  emergencyContact: string | null;
-  emergencyPhone: string | null;
+  /** Backend returns a nested object { name, phone, relation } */
+  emergencyContact: {
+    name: string | null;
+    phone: string | null;
+    relation: string | null;
+  } | null;
   updatedAt: string;
 }
 
@@ -119,11 +123,26 @@ export interface Visit {
   visitType: VisitType;
   chiefComplaint: string;
   diagnosis: string | null;
-  treatment: string | null;
+  /** Backend field name: treatmentNotes (maps to treatment column) */
+  treatmentNotes: string | null;
   vitalSigns: VitalSigns | null;
   status: VisitStatus;
+  /** Nested patient info returned by backend */
+  patient: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    studentId: string | null;
+  };
+  /** Nested staff info returned by backend */
+  staff: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
   createdAt: string;
-  completedAt: string | null;
+  updatedAt: string;
 }
 
 export interface VisitMedication {

@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Home, Calendar, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 const NAV_ITEMS = [
   { href: "/student/dashboard", label: "หน้าหลัก", icon: Home },
@@ -17,6 +19,15 @@ export default function StudentLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isLoading } = useAuthContext();
+
+  // Redirect if not a student after auth resolves
+  useEffect(() => {
+    if (!isLoading && user && user.role !== "student") {
+      router.replace("/staff/dashboard");
+    }
+  }, [isLoading, user, router]);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">

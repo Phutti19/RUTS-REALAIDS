@@ -105,6 +105,20 @@ export class UsersController {
   }
 
   /**
+   * GET /api/v1/users/:id/health-profile
+   * Get health profile for a specific user by UUID.
+   * Available to: staff, admin only
+   * MUST be defined before :id route to avoid path conflict.
+   */
+  @Get(':id/health-profile')
+  @UseGuards(RolesGuard)
+  @Roles('staff', 'admin')
+  async getHealthProfileById(@Param('id', ParseUUIDPipe) id: string) {
+    const data = await this.usersService.getHealthProfile(id);
+    return { success: true, data };
+  }
+
+  /**
    * GET /api/v1/users/:id
    * Get a specific user's profile by UUID.
    * Available to: staff, admin only

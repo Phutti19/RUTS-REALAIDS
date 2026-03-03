@@ -21,7 +21,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Sarabun", "Noto Sans Thai", Arial, Helvetica, sans-serif;
+  font-family: "Prompt", "Kanit", Arial, Helvetica, sans-serif;
 }
 
 /* Smooth scroll */
