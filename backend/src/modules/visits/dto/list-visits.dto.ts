@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsString,
   IsInt,
+  IsArray,
   Min,
   Max,
   IsDateString,
@@ -25,8 +26,10 @@ export class ListVisitsDto {
   limit?: number = 20;
 
   @IsOptional()
-  @IsEnum(['waiting', 'in_treatment', 'completed', 'referred'])
-  status?: string;
+  @Transform(({ value }) => (value ? (Array.isArray(value) ? value : [value]) : undefined))
+  @IsArray()
+  @IsEnum(['waiting', 'in_treatment', 'completed', 'referred'], { each: true })
+  status?: string[];
 
   @IsOptional()
   @IsEnum(['walk_in', 'emergency', 'appointment', 'follow_up'])

@@ -85,6 +85,7 @@ export interface MedicineBatch {
   batchNumber: string;
   quantity: number;
   expiryDate: Date;
+  receivedAt: Date;
   isExpired: boolean;
   isExpiringSoon: boolean;
   createdAt: Date;

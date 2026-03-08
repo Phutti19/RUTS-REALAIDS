@@ -51,12 +51,10 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
     ]);
     if (medRes.success && medRes.data) setMedicine(medRes.data);
     if (batchRes.success) {
-      const p = batchRes.data as unknown as { data: MedicineBatch[] };
-      setBatches(p.data ?? []);
+      setBatches(Array.isArray(batchRes.data) ? (batchRes.data as unknown as MedicineBatch[]) : []);
     }
     if (logRes.success) {
-      const p = logRes.data as unknown as { data: MedicineStockLog[] };
-      setLogs(p.data ?? []);
+      setLogs(Array.isArray(logRes.data) ? (logRes.data as unknown as MedicineStockLog[]) : []);
     }
     setLoading(false);
   }, [id]);
@@ -70,7 +68,7 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
       batchNumber,
       quantity: batchQty,
       expiryDate,
-      note: batchNote.trim() || null,
+      notes: batchNote.trim() || null,
     });
     setAddingBatch(false);
     if (res.success) {

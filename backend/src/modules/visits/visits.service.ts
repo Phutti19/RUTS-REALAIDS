@@ -102,9 +102,15 @@ export class VisitsService {
       values.push(dto.staffId);
     }
 
-    if (dto.status) {
-      conditions.push(`pv.status = $${idx++}::visit_status`);
-      values.push(dto.status);
+    if (dto.status && dto.status.length > 0) {
+      if (dto.status.length === 1) {
+        conditions.push(`pv.status = $${idx++}::visit_status`);
+        values.push(dto.status[0]);
+      } else {
+        const placeholders = dto.status.map(() => `$${idx++}::visit_status`).join(', ');
+        conditions.push(`pv.status IN (${placeholders})`);
+        values.push(...dto.status);
+      }
     }
 
     if (dto.visitType) {

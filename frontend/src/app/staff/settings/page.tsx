@@ -367,8 +367,8 @@ function UsersTab() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get<{ data: typeof users }>("/users?limit=50").then((res) => {
-      if (res.success) setUsers((res.data as unknown as { data: typeof users }).data ?? []);
+    api.get<typeof users>("/users?limit=50").then((res) => {
+      if (res.success) setUsers(Array.isArray(res.data) ? (res.data as unknown as typeof users) : []);
       setLoading(false);
     });
   }, []);

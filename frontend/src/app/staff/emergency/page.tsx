@@ -63,14 +63,14 @@ function EmergencyPageContent() {
 
   const loadIncidents = useCallback(async () => {
     const [pendingRes, inProgressRes, completedRes] = await Promise.all([
-      api.get<{ data: Incident[] }>("/incidents?status=pending&limit=50"),
-      api.get<{ data: Incident[] }>("/incidents?status=in_progress&status=accepted&limit=50"),
-      api.get<{ data: Incident[] }>("/incidents?status=completed&limit=30"),
+      api.get<Incident[]>("/incidents?status=pending&limit=50"),
+      api.get<Incident[]>("/incidents?status=in_progress&status=accepted&limit=50"),
+      api.get<Incident[]>("/incidents?status=completed&limit=30"),
     ]);
     setIncidents({
-      pending: (pendingRes.data as unknown as { data: Incident[] })?.data ?? [],
-      in_progress: (inProgressRes.data as unknown as { data: Incident[] })?.data ?? [],
-      completed: (completedRes.data as unknown as { data: Incident[] })?.data ?? [],
+      pending: Array.isArray(pendingRes.data) ? (pendingRes.data as unknown as Incident[]) : [],
+      in_progress: Array.isArray(inProgressRes.data) ? (inProgressRes.data as unknown as Incident[]) : [],
+      completed: Array.isArray(completedRes.data) ? (completedRes.data as unknown as Incident[]) : [],
     });
     setLoading(false);
   }, []);

@@ -21,9 +21,9 @@ export default function NotificationsPage() {
   const [markingAll, setMarkingAll] = useState(false);
 
   useEffect(() => {
-    api.get<{ data: Notification[] }>("/notifications?limit=50").then((res) => {
+    api.get<Notification[]>("/notifications?limit=50").then((res) => {
       if (res.success) {
-        setNotifications((res.data as unknown as { data: Notification[] }).data ?? []);
+        setNotifications(Array.isArray(res.data) ? (res.data as unknown as Notification[]) : []);
       }
       setLoading(false);
     });

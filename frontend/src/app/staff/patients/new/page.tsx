@@ -44,9 +44,9 @@ export default function NewVisitPage() {
     if (search.length < 2) { setResults([]); return; }
     const t = setTimeout(async () => {
       setSearching(true);
-      const res = await api.get<{ data: UserResult[] }>(`/users?search=${encodeURIComponent(search)}&role=student&limit=8`);
+      const res = await api.get<UserResult[]>(`/users?search=${encodeURIComponent(search)}&role=student&limit=8`);
       if (res.success) {
-        setResults((res.data as unknown as { data: UserResult[] }).data ?? []);
+        setResults(Array.isArray(res.data) ? (res.data as unknown as UserResult[]) : []);
       }
       setSearching(false);
     }, 400);

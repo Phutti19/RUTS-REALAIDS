@@ -173,6 +173,17 @@ export interface Medicine {
   createdAt: string;
 }
 
+export interface ExpiringAlert {
+  medicineId: string;
+  medicineName: string;
+  category: string;
+  batchId: string;
+  batchNumber: string;
+  quantity: number;
+  expiryDate: string;
+  daysUntilExpiry: number;
+}
+
 export interface MedicineBatch {
   id: string;
   medicineId: string;

@@ -95,9 +95,15 @@ export class EmergencyService {
       values.push(dto.reporterId);
     }
 
-    if (dto.status) {
-      conditions.push(`i.status = $${idx++}::incident_status`);
-      values.push(dto.status);
+    if (dto.status && dto.status.length > 0) {
+      if (dto.status.length === 1) {
+        conditions.push(`i.status = $${idx++}::incident_status`);
+        values.push(dto.status[0]);
+      } else {
+        const placeholders = dto.status.map(() => `$${idx++}::incident_status`).join(', ');
+        conditions.push(`i.status IN (${placeholders})`);
+        values.push(...dto.status);
+      }
     }
 
     if (dto.incidentType) {
@@ -423,8 +429,8 @@ export class EmergencyService {
       incidentType: row.incident_type,
       severity: row.severity,
       description: row.description,
-      latitude: row.latitude,
-      longitude: row.longitude,
+      latitude: row.latitude != null ? Number(row.latitude) : null,
+      longitude: row.longitude != null ? Number(row.longitude) : null,
       distanceKm,
       status: row.status,
       createdAt: row.created_at,

@@ -22,6 +22,7 @@ import { CreateMedicineDto } from './dto/create-medicine.dto';
 import { UpdateMedicineDto } from './dto/update-medicine.dto';
 import { ListMedicinesDto } from './dto/list-medicines.dto';
 import { AddBatchDto } from './dto/add-batch.dto';
+import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { ListStockLogsDto } from './dto/list-stock-logs.dto';
 
 @Controller('medicines')
@@ -118,6 +119,24 @@ export class MedicinesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteMedicine(@Param('id', ParseUUIDPipe) id: string) {
     await this.medicinesService.deleteMedicine(id);
+  }
+
+  // ── Adjust stock endpoint ─────────────────────────────────────────────────────
+
+  /**
+   * POST /api/v1/medicines/:id/adjust
+   * Manually adjust stock quantity (+ to add, - to remove).
+   * Records an 'adjusted' stock log entry.
+   */
+  @Post(':id/adjust')
+  @HttpCode(HttpStatus.OK)
+  async adjustStock(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AdjustStockDto,
+    @CurrentUser('id') callerId: string,
+  ) {
+    const data = await this.medicinesService.adjustStock(id, dto, callerId);
+    return { success: true, data };
   }
 
   // ── Batch endpoints ───────────────────────────────────────────────────────────

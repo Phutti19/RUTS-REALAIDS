@@ -2,6 +2,7 @@ import {
   IsOptional,
   IsString,
   IsInt,
+  IsBoolean,
   Min,
   Max,
   IsEnum,
@@ -19,8 +20,20 @@ export class ListMedicinesDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(200)
   limit?: number = 20;
+
+  /** Filter to only low-stock medicines (stock_quantity <= min_stock_level) */
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  lowStock?: boolean;
+
+  /** Filter to only medicines with at least one batch expiring within 30 days */
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  expiringSoon?: boolean;
 
   /** Filter by medicine category */
   @IsOptional()

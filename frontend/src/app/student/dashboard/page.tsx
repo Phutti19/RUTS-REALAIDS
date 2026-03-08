@@ -29,9 +29,9 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     // Load notifications
-    api.get<{ data: Notification[]; total: number }>("/notifications?limit=5").then((res) => {
+    api.get<Notification[]>("/notifications?limit=5").then((res) => {
       if (res.success && res.data) {
-        setNotifications((res.data as unknown as { data: Notification[] }).data ?? []);
+        setNotifications(Array.isArray(res.data) ? (res.data as unknown as Notification[]) : []);
       }
     });
 
@@ -41,9 +41,9 @@ export default function StudentDashboard() {
     });
 
     // Load recent visits
-    api.get<{ data: Visit[] }>("/visits?limit=5").then((res) => {
+    api.get<Visit[]>("/visits?limit=5").then((res) => {
       if (res.success && res.data) {
-        setRecentVisits((res.data as unknown as { data: Visit[] }).data ?? []);
+        setRecentVisits(Array.isArray(res.data) ? (res.data as unknown as Visit[]) : []);
       }
       setLoadingVisits(false);
     });

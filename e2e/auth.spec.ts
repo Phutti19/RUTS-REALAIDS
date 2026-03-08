@@ -50,10 +50,9 @@ test.describe('Auth — Registration', () => {
       },
     });
     const body = await res.json();
+    // Register returns { success: true, data: { message: "..." } }
     expect(res.status()).toBe(201);
     expect(body.success).toBe(true);
-    expect(body.data?.user?.email).toBe(NEW_STUDENT.email);
-    expect(body.data?.user?.role).toBe('student');
   });
 
   test('register duplicate email → 409', async ({ request }) => {
@@ -77,14 +76,14 @@ test.describe('Auth — Login flows', () => {
     await loginViaUI(page, 'student');
     await expect(page).toHaveURL(/\/student\/dashboard/);
     // Should see emergency button
-    await expect(page.getByText('แจ้งเหตุ')).toBeVisible();
+    await expect(page.getByText('แจ้งเหตุ').first()).toBeVisible();
   });
 
   test('staff login → redirect to /staff/dashboard', async ({ page }) => {
     await loginViaUI(page, 'staff');
     await expect(page).toHaveURL(/\/staff\/dashboard/);
     // Staff dashboard has a sidebar
-    await expect(page.getByText('แดชบอร์ด')).toBeVisible();
+    await expect(page.getByText('แดชบอร์ด').first()).toBeVisible();
   });
 
   test('admin login → redirect to /staff/dashboard', async ({ page }) => {

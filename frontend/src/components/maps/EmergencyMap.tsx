@@ -135,10 +135,7 @@ export function EmergencyMap({
               <b style="color:${color}">${getSeverityLabel(incident.severity)}</b>
               <p style="margin:4px 0 0;font-size:13px">${getTypeLabel(incident.incidentType)}</p>
               ${incident.distanceKm != null ? `<p style="margin:2px 0 0;font-size:12px;color:#666">ระยะ ${incident.distanceKm.toFixed(2)} กม.</p>` : ""}
-              <button
-                onclick="window.handleIncidentClick('${incident.id}')"
-                style="margin-top:6px;background:#1d4ed8;color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px"
-              >ดูรายละเอียด</button>
+              <p style="margin:4px 0 0;font-size:11px;color:#888">คลิกที่หมุดเพื่อดูรายละเอียด</p>
             </div>`,
             { maxWidth: 220 }
           );

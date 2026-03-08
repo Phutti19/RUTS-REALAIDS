@@ -55,16 +55,16 @@ export default function StaffDashboard() {
   const loadData = useCallback(async () => {
     const [reportRes, incidentRes, queueRes] = await Promise.all([
       api.get<DashboardReport>("/reports/dashboard"),
-      api.get<{ data: Incident[] }>("/incidents?status=pending&limit=10"),
+      api.get<Incident[]>("/incidents?status=pending&limit=10"),
       api.get<QueueVisit[]>("/visits/queue"),
     ]);
 
     if (reportRes.success && reportRes.data) setReport(reportRes.data);
     if (incidentRes.success && incidentRes.data) {
-      setIncidents((incidentRes.data as unknown as { data: Incident[] }).data ?? []);
+      setIncidents(Array.isArray(incidentRes.data) ? (incidentRes.data as unknown as Incident[]) : []);
     }
     if (queueRes.success && queueRes.data) {
-      setQueue(Array.isArray(queueRes.data) ? queueRes.data : (queueRes.data as unknown as { data: QueueVisit[] }).data ?? []);
+      setQueue(Array.isArray(queueRes.data) ? (queueRes.data as unknown as QueueVisit[]) : []);
     }
     setLoading(false);
   }, []);

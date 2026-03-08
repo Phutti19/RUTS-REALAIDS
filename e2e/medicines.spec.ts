@@ -19,7 +19,7 @@ test.describe('Medicines — Staff inventory UI', () => {
   test('medicines page is accessible and shows list', async ({ page }) => {
     await page.goto('/staff/medicines');
     await expect(page).toHaveURL(/\/staff\/medicines/);
-    await expect(page.getByText(/คลังยา|ยาและเวชภัณฑ์/)).toBeVisible();
+    await expect(page.getByText(/คลังยา|ยาและเวชภัณฑ์/).first()).toBeVisible();
   });
 
   test('medicines page has search input', async ({ page }) => {
@@ -105,7 +105,7 @@ test.describe('Medicines — API: Add medicine and batch', () => {
         batchNumber: `E2E-BATCH-${suffix}`,
         quantity: 50,
         expiryDate: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().split('T')[0],
-        note: 'E2E test batch',
+        notes: 'E2E test batch',
       },
     });
     const batchBody = await batchRes.json();

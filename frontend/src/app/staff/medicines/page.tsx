@@ -28,9 +28,9 @@ function MedicinesContent() {
     if (tab === "low") params.set("lowStock", "true");
     if (tab === "expiring") params.set("expiringSoon", "true");
 
-    api.get<{ data: Medicine[] }>(`/medicines?${params.toString()}`).then((res) => {
+    api.get<Medicine[]>(`/medicines?${params.toString()}`).then((res) => {
       if (res.success) {
-        setMedicines((res.data as unknown as { data: Medicine[] }).data ?? []);
+        setMedicines(Array.isArray(res.data) ? (res.data as unknown as Medicine[]) : []);
       }
       setLoading(false);
     });

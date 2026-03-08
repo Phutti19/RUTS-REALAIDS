@@ -106,7 +106,7 @@ export default function EmergencyReportPage() {
     }
   };
 
-  const canSubmit = incidentType !== "" && severity !== "" && !submitting;
+  const canSubmit = incidentType !== "" && severity !== "" && !submitting && gps.lat !== null && gps.lng !== null;
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -40,10 +40,10 @@ export default function StaffAppointmentsPage() {
   useEffect(() => {
     setLoading(true);
     api
-      .get<{ data: Appointment[] }>(`/appointments?date=${selectedDate}&limit=50`)
+      .get<Appointment[]>(`/appointments?date=${selectedDate}&limit=50`)
       .then((res) => {
         if (res.success) {
-          setAppointments((res.data as unknown as { data: Appointment[] }).data ?? []);
+          setAppointments(Array.isArray(res.data) ? (res.data as unknown as Appointment[]) : []);
         }
         setLoading(false);
       });

@@ -44,11 +44,10 @@ export default function PatientsPage() {
       params.set("status", statusFilter);
     }
     if (search.trim()) params.set("search", search.trim());
-    const res = await api.get<unknown>(`/visits?${params}`);
+    const res = await api.get<PatientVisit[]>(`/visits?${params}`);
     if (res.success) {
-      const payload = res.data as { data: PatientVisit[]; total: number };
-      setVisits(payload.data ?? []);
-      setTotal(payload.total ?? 0);
+      setVisits(Array.isArray(res.data) ? (res.data as unknown as PatientVisit[]) : []);
+      setTotal(res.total ?? 0);
     }
     setLoading(false);
   }, [statusFilter, page, search]);

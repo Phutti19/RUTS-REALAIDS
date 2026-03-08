@@ -1,13 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ServiceWorkerRegister } from "@/components/shared/ServiceWorkerRegister";
-
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist-sans",
-});
 
 export const metadata: Metadata = {
   title: "RUTS REALAIDS — ระบบแจ้งเหตุฉุกเฉินและห้องพยาบาล",
@@ -46,7 +40,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className={`${geist.variable} antialiased`}>
+      <body className="antialiased">
         <AuthProvider>
           <ServiceWorkerRegister />
           {children}

@@ -62,9 +62,9 @@ export default function StudentAppointmentsPage() {
   const dates = getUpcomingDates();
 
   useEffect(() => {
-    api.get<{ data: Appointment[] }>("/appointments/my").then((res) => {
+    api.get<Appointment[]>("/appointments/my").then((res) => {
       if (res.success) {
-        setAppointments((res.data as unknown as { data: Appointment[] }).data ?? []);
+        setAppointments(Array.isArray(res.data) ? (res.data as unknown as Appointment[]) : []);
       }
       setLoadingApts(false);
     });
@@ -75,7 +75,7 @@ export default function StudentAppointmentsPage() {
     setLoadingSlots(true);
     setSelectedSlot(null);
     api.get<AppointmentSlot[]>(`/appointment-slots/available?date=${selectedDate}`).then((res) => {
-      if (res.success && res.data) setSlots(res.data);
+      if (res.success) setSlots(Array.isArray(res.data) ? (res.data as unknown as AppointmentSlot[]) : []);
       else setSlots([]);
       setLoadingSlots(false);
     });
@@ -88,8 +88,10 @@ export default function StudentAppointmentsPage() {
 
     const res = await api.post<Appointment>("/appointments", {
       slotId: selectedSlot.id,
-      date: selectedDate,
-      notes: notes.trim() || null,
+      appointmentDate: selectedDate,
+      appointmentTime: selectedSlot.startTime,
+      reason: notes.trim() || "นัดพบแพทย์",
+      notes: null,
     });
 
     setBooking(false);

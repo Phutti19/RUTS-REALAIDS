@@ -54,7 +54,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
   const loadVisit = useCallback(async () => {
     const [visitRes, medsRes] = await Promise.all([
       api.get<VisitDetail>(`/visits/${id}`),
-      api.get<{ data: Medicine[] }>("/medicines?limit=200"),
+      api.get<Medicine[]>("/medicines?limit=200"),
     ]);
     if (visitRes.success && visitRes.data) {
       const v = visitRes.data;
@@ -68,8 +68,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
       });
     }
     if (medsRes.success) {
-      const payload = medsRes.data as unknown as { data: Medicine[] };
-      setMedicines(payload.data ?? []);
+      setMedicines(Array.isArray(medsRes.data) ? (medsRes.data as unknown as Medicine[]) : []);
     }
     setLoading(false);
   }, [id]);

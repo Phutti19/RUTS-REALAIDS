@@ -114,7 +114,6 @@ test.describe('Visits — API: Create, update, dispense, certificate', () => {
           headers: { Authorization: `Bearer ${staffToken}` },
           data: {
             medicineId: med.id,
-            batchId: batch.id,
             quantity: 1,
             dosageInstruction: 'รับประทานวันละ 1 ครั้ง',
           },

@@ -45,8 +45,8 @@ test.describe('Appointments — Staff slots UI', () => {
     await page.goto('/staff/appointments/slots');
     await page.getByRole('button', { name: /เพิ่มช่วงเวลา/ }).first().click();
 
-    // Select Wednesday (พ)
-    await page.locator('button').filter({ hasText: 'พ' }).click();
+    // Select Wednesday (พ) — use exact match to avoid matching พฤ
+    await page.locator('button').filter({ hasText: /^พ$/ }).click();
 
     // Set start time 09:00, end time 12:00
     const timeInputs = page.locator('input[type="time"]');
@@ -71,12 +71,6 @@ test.describe('Appointments — API: Full booking flow', () => {
     const staffToken  = await getToken(request, 'staff');
     const studentToken = await getToken(request, 'student');
 
-    // ── Get staff user ID ──────────────────────────────────────────────────────
-    const meRes  = await request.get(`${API}/users/me`, {
-      headers: { Authorization: `Bearer ${staffToken}` },
-    });
-    const staffId = (await meRes.json()).data?.id as string;
-
     // ── Create appointment slot ────────────────────────────────────────────────
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -96,15 +90,14 @@ test.describe('Appointments — API: Full booking flow', () => {
     const slotId = slotBody.data?.id as string;
 
     // ── Student books appointment ──────────────────────────────────────────────
+    // CreateAppointmentDto: { slotId, date, notes? }
     const apptDate = tomorrow.toISOString().split('T')[0];
     const bookRes  = await request.post(`${API}/appointments`, {
       headers: { Authorization: `Bearer ${studentToken}` },
       data: {
-        staffId,
         slotId,
-        appointmentDate: apptDate,
-        appointmentTime: '08:00',
-        reason: 'E2E ทดสอบจองนัดหมาย',
+        date: apptDate,
+        notes: 'E2E ทดสอบจองนัดหมาย',
       },
     });
     const bookBody = await bookRes.json();
@@ -134,11 +127,6 @@ test.describe('Appointments — API: Full booking flow', () => {
     const staffToken  = await getToken(request, 'staff');
     const studentToken = await getToken(request, 'student');
 
-    const meRes  = await request.get(`${API}/users/me`, {
-      headers: { Authorization: `Bearer ${staffToken}` },
-    });
-    const staffId = (await meRes.json()).data?.id as string;
-
     // Create slot
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 2);
@@ -150,15 +138,13 @@ test.describe('Appointments — API: Full booking flow', () => {
     });
     const slotId = (await slotRes.json()).data?.id as string;
 
-    // Book
+    // Book — CreateAppointmentDto: { slotId, date, notes? }
     const bookRes = await request.post(`${API}/appointments`, {
       headers: { Authorization: `Bearer ${studentToken}` },
       data: {
-        staffId,
         slotId,
-        appointmentDate: tomorrow.toISOString().split('T')[0],
-        appointmentTime: '10:00',
-        reason: 'E2E ยกเลิกนัดหมาย',
+        date: tomorrow.toISOString().split('T')[0],
+        notes: 'E2E ยกเลิกนัดหมาย',
       },
     });
     const apptId = (await bookRes.json()).data?.id as string;

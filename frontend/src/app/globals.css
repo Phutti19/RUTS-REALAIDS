@@ -14,7 +14,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: "Prompt", "Kanit", Arial, Helvetica, sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 

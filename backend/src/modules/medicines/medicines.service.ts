@@ -11,6 +11,7 @@ import { CreateMedicineDto } from './dto/create-medicine.dto';
 import { UpdateMedicineDto } from './dto/update-medicine.dto';
 import { ListMedicinesDto } from './dto/list-medicines.dto';
 import { AddBatchDto } from './dto/add-batch.dto';
+import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { ListStockLogsDto } from './dto/list-stock-logs.dto';
 import {
   MedicineRow,
@@ -79,6 +80,21 @@ export class MedicinesService {
       conditions.push(`m.name ILIKE $${idx}`);
       values.push(`%${dto.search}%`);
       idx++;
+    }
+
+    if (dto.lowStock) {
+      conditions.push(`m.stock_quantity <= m.min_stock_level`);
+    }
+
+    if (dto.expiringSoon) {
+      conditions.push(
+        `m.id IN (
+          SELECT medicine_id FROM medicine_batches
+          WHERE expiry_date <= CURRENT_DATE + INTERVAL '30 days'
+            AND expiry_date > CURRENT_DATE
+            AND quantity > 0
+        )`,
+      );
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -264,6 +280,54 @@ export class MedicinesService {
     return this.formatBatch(batch);
   }
 
+  async adjustStock(
+    medicineId: string,
+    dto: AdjustStockDto,
+    performedBy: string,
+  ): Promise<Medicine> {
+    await this.getMedicineById(medicineId); // throws NotFoundException if missing
+
+    if (dto.quantityChange === 0) {
+      throw new BadRequestException('quantityChange cannot be 0');
+    }
+
+    const medicine = await this.db.transaction(async (client) => {
+      // Update stock, prevent going below 0
+      const stockResult = await client.query<{ stock_quantity: number }>(
+        `UPDATE medicines
+         SET stock_quantity = GREATEST(0, stock_quantity + $1), updated_at = NOW()
+         WHERE id = $2
+         RETURNING stock_quantity`,
+        [dto.quantityChange, medicineId],
+      );
+      const newStock = stockResult.rows[0].stock_quantity;
+
+      await client.query(
+        `INSERT INTO medicine_stock_logs
+           (medicine_id, action, quantity_change, remaining_stock, performed_by, note)
+         VALUES ($1, 'adjusted', $2, $3, $4, $5)`,
+        [
+          medicineId,
+          dto.quantityChange,
+          newStock,
+          performedBy,
+          dto.note ?? `Stock adjusted by ${dto.quantityChange > 0 ? '+' : ''}${dto.quantityChange}`,
+        ],
+      );
+
+      const medResult = await client.query<MedicineRow>(
+        `SELECT * FROM medicines WHERE id = $1`,
+        [medicineId],
+      );
+      return medResult.rows[0];
+    });
+
+    this.logger.log(
+      `Stock adjusted: medicine=${medicineId} change=${dto.quantityChange} by=${performedBy}`,
+    );
+    return this.formatMedicine(medicine);
+  }
+
   async getBatches(medicineId: string): Promise<MedicineBatch[]> {
     await this.getMedicineById(medicineId); // throws NotFoundException if missing
 
@@ -367,6 +431,7 @@ export class MedicinesService {
       batchNumber: row.batch_number,
       quantity: row.quantity,
       expiryDate: row.expiry_date,
+      receivedAt: row.received_at,
       isExpired: daysLeft <= 0,
       isExpiringSoon: daysLeft > 0 && daysLeft <= EXPIRING_SOON_DAYS,
       createdAt: row.created_at,

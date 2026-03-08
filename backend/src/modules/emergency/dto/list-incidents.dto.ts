@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsString,
   IsInt,
+  IsArray,
   Min,
   Max,
   IsDateString,
@@ -25,8 +26,10 @@ export class ListIncidentsDto {
   limit?: number = 20;
 
   @IsOptional()
-  @IsEnum(['pending', 'accepted', 'in_progress', 'completed', 'cancelled'])
-  status?: string;
+  @Transform(({ value }) => (value ? (Array.isArray(value) ? value : [value]) : undefined))
+  @IsArray()
+  @IsEnum(['pending', 'accepted', 'in_progress', 'completed', 'cancelled'], { each: true })
+  status?: string[];
 
   @IsOptional()
   @IsEnum(['injury', 'illness', 'accident', 'fainting', 'other'])
