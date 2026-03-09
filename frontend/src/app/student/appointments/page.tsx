@@ -3,14 +3,11 @@
 import { useState, useEffect } from "react";
 import {
   Calendar,
-  Plus,
   ChevronRight,
   Clock,
   CheckCircle2,
   XCircle,
   Loader2,
-  X,
-  ChevronLeft,
   User,
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -88,10 +85,8 @@ export default function StudentAppointmentsPage() {
 
     const res = await api.post<Appointment>("/appointments", {
       slotId: selectedSlot.id,
-      appointmentDate: selectedDate,
-      appointmentTime: selectedSlot.startTime,
-      reason: notes.trim() || "นัดพบแพทย์",
-      notes: null,
+      date: selectedDate,
+      notes: notes.trim() || null,
     });
 
     setBooking(false);
@@ -111,11 +106,13 @@ export default function StudentAppointmentsPage() {
     }
   };
 
+  const todayStr = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD in local timezone
   const upcoming = appointments.filter((a) =>
-    ["scheduled", "checked_in"].includes(a.status)
+    ["scheduled", "checked_in"].includes(a.status) && a.appointmentDate >= todayStr
   );
   const history = appointments.filter((a) =>
-    ["completed", "cancelled", "no_show"].includes(a.status)
+    ["completed", "cancelled", "no_show"].includes(a.status) ||
+    (["scheduled", "checked_in"].includes(a.status) && a.appointmentDate < todayStr)
   );
 
   return (
@@ -243,10 +240,10 @@ export default function StudentAppointmentsPage() {
                           <button
                             key={slot.id}
                             onClick={() => setSelectedSlot(slot)}
-                            disabled={!slot.isAvailable}
+                            disabled={!!slot.isFull}
                             className={cn(
                               "p-3 rounded-xl border-2 text-left transition-all",
-                              !slot.isAvailable
+                              slot.isFull
                                 ? "border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed"
                                 : selectedSlot?.id === slot.id
                                 ? "border-blue-500 bg-blue-50"

@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ruts-realaids-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ruts_realaids
+      POSTGRES_USER: realaids
+      POSTGRES_PASSWORD: realaids1234
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migration.sql:/docker-entrypoint-initdb.d/01-migration.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U realaids -d ruts_realaids"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ruts-realaids-backend
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ruts_realaids
+      DATABASE_USER: realaids
+      DATABASE_PASSWORD: realaids1234
+      JWT_SECRET: change-this-secret-in-production
+      JWT_REFRESH_SECRET: change-this-refresh-secret-in-production
+      JWT_ACCESS_EXPIRY: 15m
+      JWT_REFRESH_EXPIRY: 7d
+      PORT: 4000
+      NODE_ENV: production
+      CORS_ORIGIN: http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ruts-realaids-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+      NEXT_PUBLIC_WS_URL: ws://localhost:4000
+      NEXT_PUBLIC_MAP_CENTER_LAT: "7.1907"
+      NEXT_PUBLIC_MAP_CENTER_LNG: "100.5930"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

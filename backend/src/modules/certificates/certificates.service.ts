@@ -178,6 +178,24 @@ export class CertificatesService {
     };
   }
 
+  // ── Get by visit ─────────────────────────────────────────────────────────────
+
+  async getByVisitId(
+    visitId: string,
+    callerId: string,
+    callerRole: string,
+  ): Promise<Certificate | null> {
+    const row = await this.db.queryOne<CertificateViewRow>(
+      `SELECT vc.* FROM v_medical_certificates vc WHERE vc.visit_id = $1`,
+      [visitId],
+    );
+    if (!row) return null;
+    if (callerRole === 'student' && row.patient_id !== callerId) {
+      throw new ForbiddenException('Access denied');
+    }
+    return this.formatCertificate(row);
+  }
+
   // ── Get detail ───────────────────────────────────────────────────────────────
 
   async getById(
@@ -264,15 +282,10 @@ export class CertificatesService {
         .text('PATIENT INFORMATION')
         .font('Helvetica');
       doc.moveDown(0.3);
-      this.pdfRow(
-        doc,
-        'Name',
-        `${cert.patient.firstName} ${cert.patient.lastName}`,
-      );
-      if (cert.patient.studentId) {
-        this.pdfRow(doc, 'Student ID', cert.patient.studentId);
+      this.pdfRow(doc, 'Name', cert.patientName);
+      if (cert.studentId) {
+        this.pdfRow(doc, 'Student ID', cert.studentId);
       }
-      this.pdfRow(doc, 'Email', cert.patient.email);
       doc.moveDown(0.8);
 
       // Diagnosis
@@ -313,10 +326,7 @@ export class CertificatesService {
         .font('Helvetica')
         .fontSize(11)
         .text('_________________________', { align: 'right' });
-      doc.text(
-        `${cert.issuedBy.firstName} ${cert.issuedBy.lastName}`,
-        { align: 'right' },
-      );
+      doc.text(cert.issuedByName, { align: 'right' });
       doc.text('University Infirmary Staff', { align: 'right' });
       doc.text(
         'Rajamangala University of Technology Srivijaya',
@@ -352,29 +362,19 @@ export class CertificatesService {
   // ── Formatter ─────────────────────────────────────────────────────────────────
 
   private formatCertificate(row: CertificateViewRow): Certificate {
-    const [patientFirst = '', ...patientRest] = (row.patient_name ?? '').split(' ');
-    const patientLast = patientRest.join(' ');
-    const [issuerFirst = '', ...issuerRest] = (row.issued_by_name ?? '').split(' ');
-    const issuerLast = issuerRest.join(' ');
     return {
       id: row.id,
       visitId: row.visit_id,
       certificateNumber: row.certificate_number,
+      patientName: row.patient_name ?? '',
+      studentId: row.student_id,
       diagnosisText: row.diagnosis_text,
       restDays: row.rest_days,
-      issuedAt: row.issued_at,
-      issuedBy: {
-        id: row.issued_by,
-        firstName: issuerFirst,
-        lastName: issuerLast,
-      },
-      patient: {
-        id: row.patient_id,
-        firstName: patientFirst,
-        lastName: patientLast,
-        studentId: row.student_id,
-        email: '',
-      },
+      recommendation: row.recommendation,
+      restStartDate: row.rest_start_date,
+      restEndDate: row.rest_end_date,
+      issuedByName: row.issued_by_name ?? '',
+      issuedAt: new Date(row.issued_at).toISOString(),
     };
   }
 }

@@ -39,19 +39,13 @@ export interface Certificate {
   id: string;
   visitId: string;
   certificateNumber: string;
+  patientName: string;
+  studentId: string | null;
   diagnosisText: string;
   restDays: number | null;
-  issuedAt: Date;
-  issuedBy: {
-    id: string;
-    firstName: string;
-    lastName: string;
-  };
-  patient: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    studentId: string | null;
-    email: string;
-  };
+  recommendation: string | null;
+  restStartDate: string | null;
+  restEndDate: string | null;
+  issuedByName: string;
+  issuedAt: string;
 }

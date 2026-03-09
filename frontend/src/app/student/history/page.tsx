@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, ClipboardList, ChevronRight } from "lucide-react";
+import { ArrowLeft, Loader2, ClipboardList } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, formatDateTime, statusLabel } from "@/lib/utils";
 import type { Visit } from "@/types";
@@ -19,9 +19,9 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get<{ data: Visit[] }>("/visits?limit=50").then((res) => {
-      if (res.success) {
-        setVisits((res.data as unknown as { data: Visit[] }).data ?? []);
+    api.get<Visit[]>("/visits?limit=50").then((res) => {
+      if (res.success && res.data) {
+        setVisits(Array.isArray(res.data) ? res.data : []);
       }
       setLoading(false);
     });

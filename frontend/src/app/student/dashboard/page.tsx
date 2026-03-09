@@ -28,6 +28,9 @@ export default function StudentDashboard() {
   const [loadingVisits, setLoadingVisits] = useState(true);
 
   useEffect(() => {
+    // Wait for auth to resolve before making API calls
+    if (!user) return;
+
     // Load notifications
     api.get<Notification[]>("/notifications?limit=5").then((res) => {
       if (res.success && res.data) {
@@ -47,7 +50,7 @@ export default function StudentDashboard() {
       }
       setLoadingVisits(false);
     });
-  }, []);
+  }, [user]);
 
   // Real-time: receive new notification
   useWebSocket<Notification>("notification:new", (notif) => {
@@ -92,7 +95,7 @@ export default function StudentDashboard() {
           <button
             onClick={handleEmergencyPress}
             className={cn(
-              "w-36 h-36 rounded-full mx-auto flex flex-col items-center justify-center gap-2",
+              "w-36 h-36 rounded-full mx-auto flex flex-col items-center justify-center gap-2 emergency-pulse",
               "bg-red-600 hover:bg-red-700 active:scale-95 transition-all shadow-lg shadow-red-200",
               "border-4 border-red-200"
             )}
@@ -112,7 +115,7 @@ export default function StudentDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="quick-actions grid grid-cols-3 gap-3">
           <Link
             href="/student/appointments"
             className="bg-white rounded-xl p-4 flex flex-col items-center gap-2 shadow-sm hover:shadow-md transition-shadow"

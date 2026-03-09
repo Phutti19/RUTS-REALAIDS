@@ -15,6 +15,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
+import { useAuthContext } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import {
@@ -43,6 +44,7 @@ interface QueueVisit {
 }
 
 export default function StaffDashboard() {
+  const { user } = useAuthContext();
   const [report, setReport] = useState<DashboardReport | null>(null);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [queue, setQueue] = useState<QueueVisit[]>([]);
@@ -70,9 +72,10 @@ export default function StaffDashboard() {
   }, []);
 
   useEffect(() => {
+    if (!user) return;
     loadData();
     hasMounted.current = true;
-  }, [loadData]);
+  }, [user, loadData]);
 
   // Play alert sound
   const playAlert = useCallback(() => {
@@ -156,13 +159,13 @@ export default function StaffDashboard() {
 
       {/* Stats cards */}
       {loading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="stats-grid grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="bg-white rounded-2xl p-4 shadow-sm animate-pulse h-24" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="stats-grid grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard
             title="เหตุฉุกเฉิน"
             value={report?.incidentsToday.total ?? 0}

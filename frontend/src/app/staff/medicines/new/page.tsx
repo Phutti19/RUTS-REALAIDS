@@ -19,7 +19,6 @@ export default function NewMedicinePage() {
   const [error, setError] = useState("");
 
   const [name, setName] = useState("");
-  const [genericName, setGenericName] = useState("");
   const [category, setCategory] = useState("medicine");
   const [unit, setUnit] = useState("");
   const [minStockLevel, setMinStockLevel] = useState(10);
@@ -31,7 +30,6 @@ export default function NewMedicinePage() {
     setError("");
     const res = await api.post<{ id: string }>("/medicines", {
       name: name.trim(),
-      genericName: genericName.trim() || null,
       category,
       unit: unit.trim(),
       minStockLevel,
@@ -91,17 +89,6 @@ export default function NewMedicinePage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="เช่น พาราเซตามอล 500mg"
-            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
-
-        {/* Generic Name */}
-        <div>
-          <label className="text-xs font-semibold text-gray-600 mb-1 block">ชื่อสามัญ</label>
-          <input
-            value={genericName}
-            onChange={(e) => setGenericName(e.target.value)}
-            placeholder="เช่น Paracetamol"
             className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
         </div>

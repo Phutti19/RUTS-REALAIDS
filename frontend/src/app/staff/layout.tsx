@@ -18,6 +18,7 @@ import {
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
 
 const NAV_ITEMS = [
   { href: "/staff/dashboard", label: "แดชบอร์ด", icon: LayoutDashboard },
@@ -52,11 +53,12 @@ export default function StaffLayout({
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className="portal-page min-h-screen bg-gray-100 dark:bg-gray-950 flex">
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-blue-900 text-white flex flex-col transform transition-transform duration-200 ease-in-out",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-blue-900 text-white flex flex-col sidebar-enter",
+          "transform transition-transform duration-200 ease-in-out",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
           "lg:translate-x-0 lg:static lg:flex"
         )}
@@ -64,7 +66,7 @@ export default function StaffLayout({
         {/* Logo */}
         <div className="h-16 flex items-center px-4 border-b border-blue-800">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-500/40">
               <Siren size={18} className="text-white" />
             </div>
             <div>
@@ -75,7 +77,7 @@ export default function StaffLayout({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 overflow-y-auto">
+        <nav className="sidebar-nav flex-1 py-4 overflow-y-auto">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const isActive = pathname.startsWith(href);
             return (
@@ -84,10 +86,10 @@ export default function StaffLayout({
                 href={href}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 text-sm transition-colors",
+                  "flex items-center gap-3 px-4 py-3 text-sm transition-all duration-200 relative border-l-4",
                   isActive
-                    ? "bg-blue-800 text-white border-r-4 border-blue-400"
-                    : "text-blue-200 hover:bg-blue-800 hover:text-white"
+                    ? "bg-blue-800 text-white border-blue-300"
+                    : "text-blue-200 hover:bg-blue-800/60 hover:text-white border-transparent hover:translate-x-1"
                 )}
               >
                 <Icon size={18} />
@@ -107,7 +109,7 @@ export default function StaffLayout({
           </div>
           <button
             onClick={handleLogout}
-            className="mt-3 w-full flex items-center gap-2 text-xs text-blue-300 hover:text-white transition-colors"
+            className="mt-3 w-full flex items-center gap-2 text-xs text-blue-300 hover:text-white hover:gap-3 transition-all duration-200"
           >
             <LogOut size={14} />
             ออกจากระบบ
@@ -126,28 +128,29 @@ export default function StaffLayout({
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sticky top-0 z-30">
+        <header className="header-enter h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 sticky top-0 z-30 shadow-sm">
           <button
-            className="lg:hidden p-2 rounded-md hover:bg-gray-100"
+            className="lg:hidden p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
             onClick={() => setSidebarOpen(!sidebarOpen)}
           >
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="ml-auto flex items-center gap-3">
+            <ThemeToggle />
             <Link
               href="/staff/notifications"
-              className="p-2 rounded-md hover:bg-gray-100 relative"
+              className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 relative transition-colors hover:scale-110 duration-200"
             >
-              <Bell size={20} className="text-gray-600" />
+              <Bell size={20} className="text-gray-600 dark:text-gray-300" />
             </Link>
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-gray-700 dark:text-gray-200">
               {user?.firstName} {user?.lastName}
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-4">{children}</main>
+        <main className="page-enter flex-1 overflow-auto p-4">{children}</main>
       </div>
     </div>
   );

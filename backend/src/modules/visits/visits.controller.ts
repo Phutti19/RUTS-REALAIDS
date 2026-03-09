@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 
 import { VisitsService } from './visits.service';
+import { CertificatesService } from '../certificates/certificates.service';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -21,11 +22,15 @@ import { CreateVisitDto } from './dto/create-visit.dto';
 import { UpdateVisitDto } from './dto/update-visit.dto';
 import { ListVisitsDto } from './dto/list-visits.dto';
 import { DispenseMedicationDto } from './dto/dispense-medication.dto';
+import { CreateCertificateForVisitDto } from '../certificates/dto/create-certificate-for-visit.dto';
 
 @Controller('visits')
 @UseGuards(AuthGuard) // All visits routes require authentication
 export class VisitsController {
-  constructor(private readonly visitsService: VisitsService) {}
+  constructor(
+    private readonly visitsService: VisitsService,
+    private readonly certificatesService: CertificatesService,
+  ) {}
 
   // ── Queue (must come before :id to avoid "queue" being parsed as a UUID) ─────
 
@@ -149,6 +154,43 @@ export class VisitsController {
     @Body() dto: DispenseMedicationDto,
   ) {
     const data = await this.visitsService.dispenseMedication(id, staffId, dto);
+    return { success: true, data };
+  }
+
+  // ── Certificate ───────────────────────────────────────────────────────────────
+
+  /**
+   * GET /api/v1/visits/:id/certificate
+   * Get the medical certificate for a visit (null if not yet issued).
+   */
+  @Get(':id/certificate')
+  async getVisitCertificate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    const data = await this.certificatesService.getByVisitId(id, userId, role);
+    return { success: true, data };
+  }
+
+  /**
+   * POST /api/v1/visits/:id/certificate
+   * Issue a medical certificate for the visit. One per visit (409 if exists).
+   * Available to: staff, admin only
+   */
+  @Post(':id/certificate')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(RolesGuard)
+  @Roles('staff', 'admin')
+  async createVisitCertificate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') staffId: string,
+    @Body() dto: CreateCertificateForVisitDto,
+  ) {
+    const data = await this.certificatesService.createCertificate(staffId, {
+      visitId: id,
+      ...dto,
+    });
     return { success: true, data };
   }
 

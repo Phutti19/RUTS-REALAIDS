@@ -1,16 +1,30 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
-  MapPin,
   ArrowLeft,
   Loader2,
   AlertCircle,
   CheckCircle2,
+  RefreshCw,
+  Navigation,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+
+const LocationPicker = dynamic(
+  () => import("@/components/maps/LocationPicker").then((m) => m.LocationPicker),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-[220px] rounded-xl bg-gray-100 animate-pulse flex items-center justify-center">
+        <Loader2 size={20} className="text-gray-400 animate-spin" />
+      </div>
+    ),
+  }
+);
 
 type IncidentType = "injury" | "illness" | "accident" | "fainting" | "other";
 type Severity = "low" | "medium" | "high" | "critical";
@@ -22,6 +36,10 @@ interface GpsState {
   loading: boolean;
   error: string;
 }
+
+// University default coordinates (fallback when GPS unavailable)
+const DEFAULT_LAT = parseFloat(process.env.NEXT_PUBLIC_MAP_CENTER_LAT ?? "7.1907");
+const DEFAULT_LNG = parseFloat(process.env.NEXT_PUBLIC_MAP_CENTER_LNG ?? "100.5930");
 
 const INCIDENT_TYPES: { value: IncidentType; label: string; emoji: string }[] = [
   { value: "injury", label: "บาดเจ็บ", emoji: "🩹" },
@@ -47,20 +65,24 @@ export default function EmergencyReportPage() {
     loading: true,
     error: "",
   });
+  // Picked location — updated by GPS success or by dragging/clicking the map
+  const [pickedLat, setPickedLat] = useState(DEFAULT_LAT);
+  const [pickedLng, setPickedLng] = useState(DEFAULT_LNG);
+
   const [incidentType, setIncidentType] = useState<IncidentType | "">("");
   const [severity, setSeverity] = useState<Severity | "">("");
   const [description, setDescription] = useState("");
   const [locationName, setLocationName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [gpsRetry, setGpsRetry] = useState(0);
 
-  // Auto-get GPS on mount
   useEffect(() => {
     if (!navigator.geolocation) {
       setGps((s) => ({ ...s, loading: false, error: "อุปกรณ์ไม่รองรับ GPS" }));
       return;
     }
-
+    setGps((s) => ({ ...s, loading: true, error: "" }));
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setGps({
@@ -70,19 +92,35 @@ export default function EmergencyReportPage() {
           loading: false,
           error: "",
         });
+        // Move picked location to actual GPS position
+        setPickedLat(pos.coords.latitude);
+        setPickedLng(pos.coords.longitude);
       },
       (err) => {
         setGps((s) => ({
           ...s,
           loading: false,
-          error: err.code === 1 ? "กรุณาอนุญาต GPS" : "ไม่สามารถดึง GPS ได้",
+          error: err.code === 1 ? "ไม่ได้รับอนุญาต GPS" : "ไม่สามารถดึง GPS ได้",
         }));
       },
       { enableHighAccuracy: true, timeout: 10_000 }
     );
+  }, [gpsRetry]);
+
+  const handlePickedLocation = useCallback((lat: number, lng: number) => {
+    setPickedLat(lat);
+    setPickedLng(lng);
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Reset map to GPS position (or university default)
+  const handleResetToGps = () => {
+    const lat = gps.lat ?? DEFAULT_LAT;
+    const lng = gps.lng ?? DEFAULT_LNG;
+    setPickedLat(lat);
+    setPickedLng(lng);
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!incidentType || !severity) return;
     setSubmitError("");
@@ -92,8 +130,8 @@ export default function EmergencyReportPage() {
       incidentType,
       severity,
       description: description.trim() || null,
-      latitude: gps.lat,
-      longitude: gps.lng,
+      latitude: pickedLat,
+      longitude: pickedLng,
       locationName: locationName.trim() || null,
     });
 
@@ -106,7 +144,7 @@ export default function EmergencyReportPage() {
     }
   };
 
-  const canSubmit = incidentType !== "" && severity !== "" && !submitting && gps.lat !== null && gps.lng !== null;
+  const canSubmit = incidentType !== "" && severity !== "" && !submitting && !gps.loading;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -121,7 +159,7 @@ export default function EmergencyReportPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="px-4 py-4 space-y-5 pb-24">
+      <form onSubmit={handleSubmit} className="px-4 py-4 space-y-5 pb-32">
         {/* GPS Status */}
         <div
           className={cn(
@@ -144,23 +182,64 @@ export default function EmergencyReportPage() {
             {gps.loading ? (
               <p className="text-sm text-blue-700">กำลังดึงตำแหน่ง GPS...</p>
             ) : gps.error ? (
-              <p className="text-sm text-yellow-700">{gps.error}</p>
+              <>
+                <p className="text-sm text-yellow-700 font-medium">{gps.error}</p>
+                <p className="text-xs text-yellow-600">ปักหมุดตำแหน่งบนแผนที่ด้านล่างด้วยตนเอง</p>
+              </>
             ) : (
               <>
                 <p className="text-sm text-green-700 font-medium">ดึง GPS สำเร็จ</p>
                 <p className="text-xs text-green-600">
-                  {gps.lat?.toFixed(5)}, {gps.lng?.toFixed(5)} ±{gps.accuracy}m
+                  ±{gps.accuracy}m · ลากหมุดเพื่อปรับตำแหน่ง
                 </p>
               </>
             )}
           </div>
-          <MapPin
-            size={18}
-            className={cn(
-              "flex-shrink-0",
-              gps.lat ? "text-green-500" : "text-gray-300"
+          {gps.error ? (
+            <button
+              type="button"
+              onClick={() => setGpsRetry((n) => n + 1)}
+              className="flex-shrink-0 flex items-center gap-1 px-2 py-1 text-xs text-yellow-700 bg-yellow-100 hover:bg-yellow-200 rounded-lg"
+            >
+              <RefreshCw size={13} /> ลองใหม่
+            </button>
+          ) : null}
+        </div>
+
+        {/* Map Location Picker — position:relative + z-index:0 creates a stacking context
+            that contains Leaflet's internal z-indexes (200-1000) so they can't bleed
+            over the sticky header */}
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ position: "relative", zIndex: 0 }}>
+          <div className="flex items-center justify-between px-4 pt-3 pb-2">
+            <div>
+              <p className="text-sm font-semibold text-gray-700">ตำแหน่งเกิดเหตุ</p>
+              <p className="text-xs text-gray-400">
+                {gps.loading
+                  ? "รอ GPS..."
+                  : `${pickedLat.toFixed(5)}, ${pickedLng.toFixed(5)}`}
+              </p>
+            </div>
+            {!gps.loading && (
+              <button
+                type="button"
+                onClick={handleResetToGps}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"
+              >
+                <Navigation size={12} />
+                {gps.lat ? "ตำแหน่งฉัน" : "มทร.ศรีวิชัย"}
+              </button>
             )}
-          />
+          </div>
+          <div className="px-3 pb-3">
+            <LocationPicker
+              lat={pickedLat}
+              lng={pickedLng}
+              onChange={handlePickedLocation}
+            />
+            <p className="text-xs text-gray-400 mt-2 text-center">
+              แตะแผนที่หรือลากหมุดแดงเพื่อปรับตำแหน่ง
+            </p>
+          </div>
         </div>
 
         {/* Location name (optional) */}
@@ -228,20 +307,10 @@ export default function EmergencyReportPage() {
                     : "border-gray-200 bg-white hover:border-gray-300"
                 )}
               >
-                <div
-                  className={cn(
-                    "text-sm font-bold",
-                    severity === value ? "" : "text-gray-700"
-                  )}
-                >
+                <div className={cn("text-sm font-bold", severity === value ? "" : "text-gray-700")}>
                   {label}
                 </div>
-                <div
-                  className={cn(
-                    "text-xs mt-0.5",
-                    severity === value ? "opacity-70" : "text-gray-400"
-                  )}
-                >
+                <div className={cn("text-xs mt-0.5", severity === value ? "opacity-70" : "text-gray-400")}>
                   {desc}
                 </div>
               </button>
@@ -276,29 +345,31 @@ export default function EmergencyReportPage() {
         )}
 
         {/* Actions */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 flex gap-3">
-          <a
-            href="tel:191"
-            className="flex-none flex items-center justify-center gap-2 px-5 py-3 border-2 border-red-500 text-red-600 rounded-xl font-semibold text-sm hover:bg-red-50"
-          >
-            📞 โทร 191
-          </a>
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className={cn(
-              "flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all",
-              canSubmit
-                ? "bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-200"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
-            )}
-          >
-            {submitting ? (
-              <><Loader2 size={18} className="animate-spin" />กำลังส่ง...</>
-            ) : (
-              <>🆘 แจ้งเหตุฉุกเฉิน</>
-            )}
-          </button>
+        <div className="fixed bottom-[58px] left-0 right-0 bg-white border-t border-gray-200">
+          <div className="max-w-md mx-auto px-4 py-3 grid grid-cols-2 gap-2">
+            <a
+              href="tel:191"
+              className="flex items-center justify-center gap-2 py-3 border-2 border-red-500 text-red-600 rounded-xl font-semibold text-sm hover:bg-red-50"
+            >
+              📞 โทร 191
+            </a>
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              className={cn(
+                "py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all",
+                canSubmit
+                  ? "bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-200"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              )}
+            >
+              {submitting ? (
+                <><Loader2 size={18} className="animate-spin" />กำลังส่ง...</>
+              ) : (
+                <>🆘 แจ้งเหตุ</>
+              )}
+            </button>
+          </div>
         </div>
       </form>
     </div>

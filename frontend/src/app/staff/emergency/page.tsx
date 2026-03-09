@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import {
@@ -202,7 +202,7 @@ function EmergencyPageContent() {
       {/* Map view */}
       {viewMode === "map" ? (
         <div className="flex gap-4 flex-1 min-h-0">
-          <div className="flex-1 bg-white rounded-2xl shadow-sm overflow-hidden" style={{ minHeight: 500 }}>
+          <div className="flex-1 bg-white rounded-2xl shadow-sm overflow-hidden" style={{ minHeight: 500, position: "relative", zIndex: 0 }}>
             <EmergencyMap
               incidents={allMapIncidents}
               selectedId={selectedIncident?.id}

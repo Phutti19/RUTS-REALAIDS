@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+/* Class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -9,6 +12,11 @@
   --ruts-danger: #e02424;
   --ruts-warning: #d97706;
   --ruts-success: #057a55;
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
 }
 
 @theme inline {
@@ -41,3 +49,131 @@ html {
   background: #c1c1c1;
   border-radius: 3px;
 }
+
+/* ── Portal Animations ─────────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes pulseRing {
+  0%   { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55); }
+  70%  { box-shadow: 0 0 0 22px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+@keyframes navItemIn {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes shimmerBg {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* ── Layout entrance ──────────────────────────────────────────────────────── */
+.page-enter    { animation: fadeInUp    0.4s  cubic-bezier(0.16, 1, 0.3, 1) both; }
+.sidebar-enter { animation: fadeInLeft  0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.header-enter  { animation: fadeInDown  0.3s  ease both; }
+.nav-slide-up  { animation: slideUpFade 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ── Staggered sidebar nav links ──────────────────────────────────────────── */
+.sidebar-nav a              { animation: navItemIn 0.3s ease both; }
+.sidebar-nav a:nth-child(1) { animation-delay: 0.06s; }
+.sidebar-nav a:nth-child(2) { animation-delay: 0.12s; }
+.sidebar-nav a:nth-child(3) { animation-delay: 0.18s; }
+.sidebar-nav a:nth-child(4) { animation-delay: 0.24s; }
+.sidebar-nav a:nth-child(5) { animation-delay: 0.30s; }
+.sidebar-nav a:nth-child(6) { animation-delay: 0.36s; }
+.sidebar-nav a:nth-child(7) { animation-delay: 0.42s; }
+
+/* ── Staggered stat cards (staff dashboard) ───────────────────────────────── */
+.stats-grid > *              { animation: scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.stats-grid > *:nth-child(1) { animation-delay: 0.08s; }
+.stats-grid > *:nth-child(2) { animation-delay: 0.16s; }
+.stats-grid > *:nth-child(3) { animation-delay: 0.24s; }
+.stats-grid > *:nth-child(4) { animation-delay: 0.32s; }
+
+/* ── Staggered quick-action cards (student dashboard) ────────────────────── */
+.quick-actions > *              { animation: scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.quick-actions > *:nth-child(1) { animation-delay: 0.12s; }
+.quick-actions > *:nth-child(2) { animation-delay: 0.21s; }
+.quick-actions > *:nth-child(3) { animation-delay: 0.30s; }
+
+/* ── Emergency button pulse ring ──────────────────────────────────────────── */
+.emergency-pulse { animation: pulseRing 2s ease-out infinite; }
+
+/* ── Loading shimmer skeleton ─────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, #e5e7eb 25%, #f9fafb 50%, #e5e7eb 75%);
+  background-size: 200% 100%;
+  animation: shimmerBg 1.5s infinite linear;
+  border-radius: 6px;
+}
+.dark .portal-page .skeleton {
+  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+  background-size: 200% 100%;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Portal dark-mode fallback — scoped to .portal-page (staff/student layouts).
+ * Auth pages (login, forgot-password, reset-password) are EXCLUDED and always
+ * render in light mode regardless of the user's theme preference.
+ *
+ * The :not([class*="dark:..."]) guard ensures intentional dark: variants
+ * defined directly on elements are never overridden.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* Backgrounds */
+.dark .portal-page .bg-white:not([class*="dark:bg"])    { background-color: rgb(30  41  59); } /* slate-800 */
+.dark .portal-page .bg-gray-50:not([class*="dark:bg"])  { background-color: rgb(15  23  42); } /* slate-900 */
+.dark .portal-page .bg-gray-100:not([class*="dark:bg"]) { background-color: rgb(51  65  85); } /* slate-700 */
+
+/* Text */
+.dark .portal-page .text-gray-900:not([class*="dark:text"]),
+.dark .portal-page .text-gray-800:not([class*="dark:text"]) { color: rgb(241 245 249); }        /* slate-100 */
+.dark .portal-page .text-gray-700:not([class*="dark:text"]),
+.dark .portal-page .text-gray-600:not([class*="dark:text"]) { color: rgb(203 213 225); }        /* slate-300 */
+.dark .portal-page .text-gray-500:not([class*="dark:text"]),
+.dark .portal-page .text-gray-400:not([class*="dark:text"]) { color: rgb(148 163 184); }        /* slate-400 */
+
+/* Borders */
+.dark .portal-page .border-gray-200:not([class*="dark:border"]),
+.dark .portal-page .border-gray-100:not([class*="dark:border"]) { border-color: rgb(51 65 85); }
+
+/* Divider separators (divide-y / divide-x) */
+.dark .portal-page .divide-gray-50  > :not([hidden]) ~ :not([hidden]),
+.dark .portal-page .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(30 41 59); }
+
+/* Hover backgrounds */
+.dark .portal-page .hover\:bg-gray-50:hover,
+.dark .portal-page .hover\:bg-gray-100:hover { background-color: rgb(51 65 85); }
+
+/* Card shadows — stronger in dark mode so cards stand out against background */
+.dark .portal-page .shadow-sm { box-shadow: 0 1px 3px 0 rgba(0 0 0 / 0.5); }
+.dark .portal-page .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0 0 0 / 0.6), 0 4px 6px -4px rgba(0 0 0 / 0.4); }
+
+/* Form inputs */
+.dark .portal-page input:not([class*="dark:"]),
+.dark .portal-page textarea:not([class*="dark:"]),
+.dark .portal-page select:not([class*="dark:"]) {
+  background-color: rgb(30 41 59);
+  color: rgb(241 245 249);
+  border-color: rgb(51 65 85);
+}
+.dark .portal-page input::placeholder,
+.dark .portal-page textarea::placeholder { color: rgb(100 116 139); }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Incident } from "@/types";
 
 interface Props {
@@ -30,6 +30,8 @@ export function EmergencyMap({
   const leafletRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersRef = useRef<any[]>([]);
+  // Signals that the map is initialized — triggers the marker effect to re-run
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     // Dynamically import Leaflet (no SSR)
@@ -78,6 +80,7 @@ export function EmergencyMap({
         .openPopup();
 
       leafletRef.current = map;
+      setMapReady(true); // notify marker effect that map is ready
     });
 
     return () => {
@@ -89,7 +92,8 @@ export function EmergencyMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update markers when incidents change
+  // Update markers when incidents change — also re-runs when mapReady flips true,
+  // which handles the race condition where incidents arrive before Leaflet finishes loading.
   useEffect(() => {
     if (!leafletRef.current) return;
 
@@ -149,7 +153,7 @@ export function EmergencyMap({
         map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
       }
     });
-  }, [incidents, selectedId, infirmaryLat, infirmaryLng, onSelectIncident]);
+  }, [incidents, selectedId, infirmaryLat, infirmaryLng, onSelectIncident, mapReady]);
 
   return (
     <>

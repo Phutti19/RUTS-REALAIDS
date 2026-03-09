@@ -240,7 +240,8 @@ export interface AppointmentSlot {
   maxPatientsPerSlot: number;
   isActive: boolean;
   bookedCount?: number;
-  isAvailable?: boolean;
+  availableSpots?: number;
+  isFull?: boolean;
 }
 
 export interface Appointment {

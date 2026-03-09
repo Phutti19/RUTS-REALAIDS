@@ -45,6 +45,15 @@ export default function StudentProfilePage() {
   const [healthMsg, setHealthMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [loadingHealth, setLoadingHealth] = useState(true);
 
+  // Sync personal info states when user context finishes loading
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName ?? "");
+      setLastName(user.lastName ?? "");
+      setPhone(user.phone ?? "");
+    }
+  }, [user]);
+
   useEffect(() => {
     api.get<HealthProfile>("/users/me/health-profile").then((res) => {
       if (res.success && res.data) {
@@ -85,6 +94,19 @@ export default function StudentProfilePage() {
     });
     setSavingHealth(false);
     if (res.success) {
+      // Update health display state with saved values
+      setHealth({
+        userId: user?.id ?? "",
+        bloodType: bloodType || null,
+        allergies: allergies.trim() || null,
+        chronicDiseases: chronicDiseases.trim() || null,
+        emergencyContact: {
+          name: emergencyContact.trim() || null,
+          phone: emergencyPhone.trim() || null,
+          relation: null,
+        },
+        updatedAt: new Date().toISOString(),
+      });
       setHealthMsg({ type: "success", text: "บันทึกสำเร็จ" });
       setEditHealth(false);
     } else {
@@ -207,10 +229,10 @@ export default function StudentProfilePage() {
               </>
             ) : (
               <div className="space-y-2 text-sm">
-                <InfoRow label="ชื่อ-นามสกุล" value={`${user?.firstName} ${user?.lastName}`} />
+                <InfoRow label="ชื่อ-นามสกุล" value={`${firstName} ${lastName}`.trim() || "—"} />
                 <InfoRow label="รหัสนักศึกษา" value={user?.studentId ?? "—"} />
                 <InfoRow label="อีเมล" value={user?.email ?? "—"} />
-                <InfoRow label="เบอร์โทร" value={user?.phone ?? "ยังไม่ระบุ"} />
+                <InfoRow label="เบอร์โทร" value={phone || "ยังไม่ระบุ"} />
               </div>
             )}
           </div>

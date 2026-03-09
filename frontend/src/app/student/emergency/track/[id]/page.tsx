@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
-import { CheckCircle2, Clock, Loader2, MapPin, Phone, User } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, Phone, User } from "lucide-react";
 import { api } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { cn, formatDateTime, incidentTypeLabel, severityLabel } from "@/lib/utils";
@@ -40,11 +40,11 @@ export default function TrackIncidentPage({
     });
   }, [id]);
 
-  // Real-time status update
-  useWebSocket<{ incidentId: string; status: string; responder?: IncidentDetail["responder"] }>(
+  // Real-time status update — backend sends full IncidentDetail (field is `id`, not `incidentId`)
+  useWebSocket<IncidentDetail>(
     "incident:status_update",
     (data) => {
-      if (data.incidentId === id) {
+      if (data.id === id) {
         setIncident((prev) =>
           prev
             ? {
@@ -59,10 +59,10 @@ export default function TrackIncidentPage({
     [id]
   );
 
-  useWebSocket<{ incidentId: string; responder: IncidentDetail["responder"] }>(
+  useWebSocket<IncidentDetail>(
     "incident:accepted",
     (data) => {
-      if (data.incidentId === id) {
+      if (data.id === id) {
         setIncident((prev) =>
           prev
             ? { ...prev, status: "accepted", responder: data.responder }
