@@ -4,8 +4,8 @@ export class VitalSignsDto {
   /** Body temperature in Celsius */
   @IsOptional()
   @IsNumber()
-  @Min(30)
-  @Max(45)
+  @Min(25)
+  @Max(50)
   temperature?: number;
 
   /** Blood pressure e.g. "120/80" */

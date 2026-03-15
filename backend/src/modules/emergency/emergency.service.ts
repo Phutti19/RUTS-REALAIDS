@@ -8,6 +8,7 @@ import {
 
 import { DatabaseService, PaginatedResult } from '../../database/db.service';
 import { WsService } from '../../websocket/ws.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateIncidentDto } from './dto/create-incident.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { AddImageDto } from './dto/add-image.dto';
@@ -39,6 +40,7 @@ export class EmergencyService {
   constructor(
     private readonly db: DatabaseService,
     private readonly ws: WsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ── Create incident ──────────────────────────────────────────────────────────
@@ -66,8 +68,22 @@ export class EmergencyService {
 
     const detail = await this.getIncidentById(incident.id, reporterId, 'student');
 
-    // Broadcast to all staff
+    // Broadcast to all staff via WebSocket
     this.ws.notifyNewIncident(detail);
+
+    // Persist notification for all staff in DB
+    const severityMap: Record<string, string> = { low: 'ต่ำ', medium: 'ปานกลาง', high: 'สูง', critical: 'วิกฤต' };
+    const typeMap: Record<string, string> = { injury: 'บาดเจ็บ', illness: 'ป่วย', accident: 'อุบัติเหตุ', fainting: 'หมดสติ', other: 'อื่นๆ' };
+    const sevLabel = severityMap[dto.severity] ?? dto.severity;
+    const typeLabel = typeMap[dto.incidentType] ?? dto.incidentType;
+    await this.notifications.notifyAllStaff(
+      'emergency',
+      `🚨 เหตุฉุกเฉิน: ${typeLabel}`,
+      `ระดับ ${sevLabel}${dto.description ? ' — ' + dto.description : ''}`,
+      'incident',
+      incident.id,
+    );
+
     this.logger.log(`New incident created: id=${incident.id} reporter=${reporterId}`);
 
     return detail;

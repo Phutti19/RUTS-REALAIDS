@@ -10,8 +10,6 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
 import * as fs from 'fs';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import bcrypt from 'bcryptjs';
 
 import { DatabaseService, PaginatedResult } from '../../database/db.service';
@@ -33,8 +31,17 @@ import {
   EmergencyContactRow,
 } from './interfaces/settings.interfaces';
 
-const execFileAsync = promisify(execFile);
 const BCRYPT_ROUNDS = 12;
+
+const BACKUP_TABLES = [
+  'users', 'student_health_profiles', 'refresh_tokens', 'password_reset_tokens', 'login_attempts',
+  'emergency_incidents', 'incident_images', 'incident_responders', 'incident_status_logs', 'emergency_contacts_directory',
+  'treatment_types', 'patient_visits', 'visit_medications', 'medical_certificates',
+  'medicines', 'medicine_batches', 'medicine_stock_logs',
+  'appointment_slots', 'appointments',
+  'notifications', 'push_subscriptions',
+  'system_settings', 'audit_logs', 'data_backups',
+];
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -293,34 +300,32 @@ export class SettingsService {
       fs.mkdirSync(backupDir, { recursive: true });
     }
 
-    // Filename: backup-20260301-120000.dump
     const ts = new Date()
       .toISOString()
       .replace(/\.\d{3}Z$/, '')
       .replace('T', '-')
       .replace(/:/g, '');
-    const filename = `backup-${ts}.dump`;
+    const filename = `backup-${ts}.json`;
     const filePath = path.join(backupDir, filename);
 
     const backupId = randomUUID();
     await this.db.execute(
-      `INSERT INTO data_backups (id, filename, backup_type, status, performed_by)
-       VALUES ($1, $2, 'manual', 'pending', $3)`,
+      `INSERT INTO data_backups (id, filename, backup_type, performed_by)
+       VALUES ($1, $2, 'manual', $3)`,
       [backupId, filename, createdBy],
     );
 
-    const pgHost = this.config.get<string>('DATABASE_HOST', 'localhost');
-    const pgPort = String(this.config.get<number>('DATABASE_PORT', 5432));
-    const pgUser = this.config.get<string>('DATABASE_USER', 'realaids');
-    const pgPassword = this.config.get<string>('DATABASE_PASSWORD', 'realaids1234');
-    const pgDb = this.config.get<string>('DATABASE_NAME', 'ruts_realaids');
-
     try {
-      await execFileAsync(
-        'pg_dump',
-        ['-h', pgHost, '-p', pgPort, '-U', pgUser, '-d', pgDb, '-Fc', '-f', filePath],
-        { env: { ...process.env, PGPASSWORD: pgPassword } },
-      );
+      const dump: Record<string, unknown[]> = {};
+      for (const table of BACKUP_TABLES) {
+        const rows = await this.db.queryMany<Record<string, unknown>>(
+          `SELECT * FROM ${table}`,
+        );
+        dump[table] = rows;
+      }
+
+      const content = JSON.stringify({ exportedAt: new Date().toISOString(), tables: dump }, null, 2);
+      fs.writeFileSync(filePath, content, 'utf8');
 
       const stat = fs.statSync(filePath);
       const row = await this.db.queryOne<DataBackupRow>(
@@ -330,16 +335,15 @@ export class SettingsService {
          RETURNING *`,
         [stat.size, backupId],
       );
+      this.logger.log(`Backup completed: ${filename} (${stat.size} bytes)`);
       return formatBackup(row!);
     } catch (err: unknown) {
       await this.db.execute(
         `UPDATE data_backups SET status = 'failed' WHERE id = $1`,
         [backupId],
       );
-      this.logger.error(`pg_dump failed: ${(err as Error).message}`);
-      throw new InternalServerErrorException(
-        'Backup creation failed. Ensure pg_dump is available in PATH.',
-      );
+      this.logger.error(`Backup failed: ${(err as Error).message}`);
+      throw new InternalServerErrorException('Backup creation failed.');
     }
   }
 

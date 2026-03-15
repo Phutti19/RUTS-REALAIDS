@@ -22,6 +22,7 @@ import { CreateVisitDto } from './dto/create-visit.dto';
 import { UpdateVisitDto } from './dto/update-visit.dto';
 import { ListVisitsDto } from './dto/list-visits.dto';
 import { DispenseMedicationDto } from './dto/dispense-medication.dto';
+import { RegisterWalkInPatientDto } from './dto/register-walkin-patient.dto';
 import { CreateCertificateForVisitDto } from '../certificates/dto/create-certificate-for-visit.dto';
 
 @Controller('visits')
@@ -31,6 +32,23 @@ export class VisitsController {
     private readonly visitsService: VisitsService,
     private readonly certificatesService: CertificatesService,
   ) {}
+
+  // ── Walk-in registration (must come before :id routes) ───────────────────────
+
+  /**
+   * POST /api/v1/visits/register-patient
+   * Create a student account for a walk-in patient who hasn't registered yet.
+   * Password is set to studentId. Returns the new user record.
+   * Available to: staff, admin only
+   */
+  @Post('register-patient')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(RolesGuard)
+  @Roles('staff', 'admin')
+  async registerWalkInPatient(@Body() dto: RegisterWalkInPatientDto) {
+    const data = await this.visitsService.registerWalkInPatient(dto);
+    return { success: true, data };
+  }
 
   // ── Queue (must come before :id to avoid "queue" being parsed as a UUID) ─────
 

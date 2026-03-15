@@ -7,6 +7,7 @@ import {
 import { DatabaseService, PaginatedResult } from '../../database/db.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateHealthProfileDto } from './dto/update-health-profile.dto';
+import { UpdatePatientProfileDto } from './dto/update-patient-profile.dto';
 import { ListUsersDto } from './dto/list-users.dto';
 import {
   UserRow,
@@ -25,7 +26,8 @@ export class UsersService {
 
   async getMe(userId: string): Promise<UserProfile> {
     const user = await this.db.queryOne<UserRow>(
-      `SELECT id, student_id, email, first_name, last_name, phone, role, is_active, created_at
+      `SELECT id, student_id, email, first_name, last_name, phone, role, is_active, created_at,
+              national_id, title, birth_date, department, year_of_study, "position"
        FROM users
        WHERE id = $1`,
       [userId],
@@ -65,7 +67,8 @@ export class UsersService {
       `UPDATE users
        SET ${fields.join(', ')}
        WHERE id = $${idx}
-       RETURNING id, student_id, email, first_name, last_name, phone, role, is_active, created_at`,
+       RETURNING id, student_id, email, first_name, last_name, phone, role, is_active, created_at,
+                 national_id, title, birth_date, department, year_of_study, "position"`,
       values,
     );
 
@@ -179,7 +182,8 @@ export class UsersService {
 
     const countSql = `SELECT COUNT(*) FROM users ${where}`;
     const dataSql = `
-      SELECT id, student_id, email, first_name, last_name, phone, role, is_active, created_at
+      SELECT id, student_id, email, first_name, last_name, phone, role, is_active, created_at,
+              national_id, title, birth_date, department, year_of_study, "position"
       FROM users
       ${where}
       ORDER BY ${sortCol} ${sortDir}
@@ -200,7 +204,8 @@ export class UsersService {
 
   async getUserById(id: string): Promise<UserProfile> {
     const user = await this.db.queryOne<UserRow>(
-      `SELECT id, student_id, email, first_name, last_name, phone, role, is_active, created_at
+      `SELECT id, student_id, email, first_name, last_name, phone, role, is_active, created_at,
+              national_id, title, birth_date, department, year_of_study, "position"
        FROM users
        WHERE id = $1`,
       [id],
@@ -224,7 +229,46 @@ export class UsersService {
       role: row.role,
       isActive: row.is_active,
       createdAt: row.created_at,
+      nationalId: row.national_id ?? null,
+      title: row.title ?? null,
+      birthDate: row.birth_date ?? null,
+      department: row.department ?? null,
+      yearOfStudy: row.year_of_study ?? null,
+      position: row.position ?? null,
     };
+  }
+
+  // ── Staff: update patient demographics ──────────────────────────────────────
+
+  async updatePatientProfile(patientId: string, dto: UpdatePatientProfileDto): Promise<UserProfile> {
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    if (dto.title !== undefined)       { fields.push(`title = $${idx++}`);         values.push(dto.title ?? null); }
+    if (dto.nationalId !== undefined)  { fields.push(`national_id = $${idx++}`);   values.push(dto.nationalId ?? null); }
+    if (dto.birthDate !== undefined)   { fields.push(`birth_date = $${idx++}`);    values.push(dto.birthDate ?? null); }
+    if (dto.department !== undefined)  { fields.push(`department = $${idx++}`);    values.push(dto.department ?? null); }
+    if (dto.yearOfStudy !== undefined) { fields.push(`year_of_study = $${idx++}`); values.push(dto.yearOfStudy ?? null); }
+    if (dto.position !== undefined)    { fields.push(`"position" = $${idx++}`);    values.push(dto.position ?? null); }
+    if (dto.phone !== undefined)       { fields.push(`phone = $${idx++}`);         values.push(dto.phone ?? null); }
+
+    if (fields.length === 0) return this.getUserById(patientId);
+
+    fields.push(`updated_at = NOW()`);
+    values.push(patientId);
+
+    const updated = await this.db.queryOne<UserRow>(
+      `UPDATE users
+       SET ${fields.join(', ')}
+       WHERE id = $${idx}
+       RETURNING id, student_id, email, first_name, last_name, phone, role, is_active, created_at,
+                 national_id, title, birth_date, department, year_of_study, "position"`,
+      values,
+    );
+
+    if (!updated) throw new NotFoundException(`Patient '${patientId}' not found`);
+    return this.formatProfile(updated);
   }
 
   private formatHealthProfile(

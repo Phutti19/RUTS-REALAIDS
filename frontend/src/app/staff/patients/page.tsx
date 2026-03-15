@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Users, Search, Plus, Loader2, ChevronRight, ChevronLeft } from "lucide-react";
+import {
+  Users, Search, Plus, Loader2, ChevronRight, ChevronLeft,
+  UserCheck, UserX, GraduationCap,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, timeAgo, statusLabel } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -17,6 +20,20 @@ interface PatientVisit {
   createdAt: string;
 }
 
+interface StudentUser {
+  id: string;
+  studentId: string | null;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  role: string;
+  isActive: boolean;
+  department: string | null;
+  yearOfStudy: number | null;
+  createdAt: string;
+}
+
 const VISIT_TYPE_TH: Record<string, string> = {
   walk_in: "Walk-in",
   emergency: "ฉุกเฉิน",
@@ -28,11 +45,13 @@ const PAGE_SIZE = 15;
 
 export default function PatientsPage() {
   const [visits, setVisits] = useState<PatientVisit[]>([]);
+  const [students, setStudents] = useState<StudentUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
+  const [viewMode, setViewMode] = useState<"visits" | "students">("visits");
 
   const loadVisits = useCallback(async () => {
     setLoading(true);
@@ -52,9 +71,25 @@ export default function PatientsPage() {
     setLoading(false);
   }, [statusFilter, page, search]);
 
-  useEffect(() => { loadVisits(); }, [loadVisits]);
-  useEffect(() => { setPage(1); }, [statusFilter, search]);
-  useWebSocket("queue:update", () => loadVisits(), [loadVisits]);
+  const loadStudents = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams({ role: "student", limit: String(PAGE_SIZE), page: String(page) });
+    if (search.trim()) params.set("search", search.trim());
+    const res = await api.get<StudentUser[]>(`/users?${params}`);
+    if (res.success) {
+      setStudents(Array.isArray(res.data) ? (res.data as unknown as StudentUser[]) : []);
+      setTotal(res.total ?? 0);
+    }
+    setLoading(false);
+  }, [page, search]);
+
+  useEffect(() => {
+    if (viewMode === "visits") loadVisits();
+    else loadStudents();
+  }, [viewMode, loadVisits, loadStudents]);
+
+  useEffect(() => { setPage(1); }, [statusFilter, search, viewMode]);
+  useWebSocket("queue:update", () => { if (viewMode === "visits") loadVisits(); }, [loadVisits, viewMode]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -62,7 +97,7 @@ export default function PatientsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">ผู้รับบริการ</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">ผู้รับบริการ</h1>
           <p className="text-sm text-gray-500">บันทึกการรักษาและประวัติผู้ป่วย</p>
         </div>
         <Link
@@ -73,116 +108,235 @@ export default function PatientsPage() {
         </Link>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <div className="flex bg-white rounded-xl shadow-sm p-1 gap-1">
-          {[
-            { key: "active", label: "กำลังรักษา" },
-            { key: "waiting", label: "รอรับ" },
-            { key: "completed", label: "เสร็จสิ้น" },
-            { key: "all", label: "ทั้งหมด" },
-          ].map(({ key, label }) => (
-            <button key={key} onClick={() => setStatusFilter(key)}
-              className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
-                statusFilter === key ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"
-              )}
-            >
-              {label}
-            </button>
-          ))}
+      {/* View mode tabs */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex bg-white dark:bg-gray-800 rounded-xl shadow-sm p-1 gap-1 border border-gray-100 dark:border-gray-700">
+          <button
+            onClick={() => setViewMode("visits")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+              viewMode === "visits" ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            )}
+          >
+            <Users size={13} /> ประวัติการรักษา
+          </button>
+          <button
+            onClick={() => setViewMode("students")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+              viewMode === "students" ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            )}
+          >
+            <GraduationCap size={13} /> นักศึกษาทั้งหมด
+          </button>
         </div>
+
+        {/* Visit status filter — only when in visits mode */}
+        {viewMode === "visits" && (
+          <div className="flex bg-white dark:bg-gray-800 rounded-xl shadow-sm p-1 gap-1 border border-gray-100 dark:border-gray-700">
+            {[
+              { key: "active", label: "กำลังรักษา" },
+              { key: "waiting", label: "รอรับ" },
+              { key: "completed", label: "เสร็จสิ้น" },
+              { key: "all", label: "ทั้งหมด" },
+            ].map(({ key, label }) => (
+              <button key={key} onClick={() => setStatusFilter(key)}
+                className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                  statusFilter === key ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="relative flex-1 min-w-48">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาชื่อ / รหัสนักศึกษา..."
-            className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
+            placeholder={viewMode === "students" ? "ค้นหาชื่อ / รหัสนักศึกษา / อีเมล..." : "ค้นหาชื่อ / รหัสนักศึกษา..."}
+            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm dark:text-white dark:placeholder-gray-400"
           />
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                {["#", "ผู้ป่วย", "อาการหลัก", "ประเภท", "สถานะ", "เวลา", ""].map((h, i) => (
-                  <th key={i} className="text-left px-4 py-3 text-xs font-semibold text-gray-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading ? (
-                <tr><td colSpan={7} className="py-12 text-center">
-                  <Loader2 size={24} className="animate-spin text-gray-300 mx-auto" />
-                </td></tr>
-              ) : visits.length === 0 ? (
-                <tr><td colSpan={7} className="py-12 text-center">
-                  <Users size={28} className="mx-auto text-gray-200 mb-2" />
-                  <p className="text-sm text-gray-400">ไม่พบข้อมูล</p>
-                </td></tr>
-              ) : visits.map((v, idx) => (
-                <tr key={v.id} className="hover:bg-gray-50/60 transition-colors">
-                  <td className="px-4 py-3 text-xs text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-gray-800">{v.patient.firstName} {v.patient.lastName}</p>
-                    {v.patient.studentId && <p className="text-xs text-gray-400">{v.patient.studentId}</p>}
-                  </td>
-                  <td className="px-4 py-3 max-w-[200px]">
-                    <p className="text-gray-700 truncate">{v.chiefComplaint}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                      {VISIT_TYPE_TH[v.visitType] ?? v.visitType}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3"><StatusBadge status={v.status} /></td>
-                  <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{timeAgo(v.createdAt)}</td>
-                  <td className="px-4 py-3">
-                    <Link href={`/staff/patients/${v.id}`}
-                      className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors flex items-center justify-center"
-                    >
-                      <ChevronRight size={16} className="text-gray-400" />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {viewMode === "visits" ? (
+        <VisitsTable visits={visits} loading={loading} page={page} />
+      ) : (
+        <StudentsTable students={students} loading={loading} page={page} />
+      )}
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-            <p className="text-xs text-gray-500">
-              แสดง {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} จาก {total} รายการ
-            </p>
-            <div className="flex gap-1">
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed">
-                <ChevronLeft size={16} />
-              </button>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const pg = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
-                return (
-                  <button key={pg} onClick={() => setPage(pg)}
-                    className={cn("w-7 h-7 rounded-lg text-xs font-medium transition-colors",
-                      pg === page ? "bg-blue-600 text-white" : "hover:bg-gray-100 text-gray-600"
-                    )}>
-                    {pg}
-                  </button>
-                );
-              })}
-              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed">
-                <ChevronRight size={16} />
-              </button>
-            </div>
+      {totalPages > 1 && (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between px-4 py-3">
+          <p className="text-xs text-gray-500">
+            แสดง {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} จาก {total} รายการ
+          </p>
+          <div className="flex gap-1">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">
+              <ChevronLeft size={16} />
+            </button>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const pg = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
+              return (
+                <button key={pg} onClick={() => setPage(pg)}
+                  className={cn("w-7 h-7 rounded-lg text-xs font-medium transition-colors",
+                    pg === page ? "bg-blue-600 text-white" : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+                  )}>
+                  {pg}
+                </button>
+              );
+            })}
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">
+              <ChevronRight size={16} />
+            </button>
           </div>
-        )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VisitsTable({ visits, loading, page }: { visits: PatientVisit[]; loading: boolean; page: number }) {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700">
+              {["#", "ผู้ป่วย", "อาการหลัก", "ประเภท", "สถานะ", "เวลา", ""].map((h, i) => (
+                <th key={i} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
+            {loading ? (
+              <tr><td colSpan={7} className="py-12 text-center">
+                <Loader2 size={24} className="animate-spin text-gray-300 mx-auto" />
+              </td></tr>
+            ) : visits.length === 0 ? (
+              <tr><td colSpan={7} className="py-12 text-center">
+                <Users size={28} className="mx-auto text-gray-200 mb-2" />
+                <p className="text-sm text-gray-400">ไม่พบข้อมูล</p>
+              </td></tr>
+            ) : visits.map((v, idx) => (
+              <tr key={v.id} className="hover:bg-gray-50/60 dark:hover:bg-gray-700/30 transition-colors">
+                <td className="px-4 py-3 text-xs text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
+                <td className="px-4 py-3">
+                  <p className="font-medium text-gray-800 dark:text-white">{v.patient.firstName} {v.patient.lastName}</p>
+                  {v.patient.studentId && <p className="text-xs text-gray-400">{v.patient.studentId}</p>}
+                </td>
+                <td className="px-4 py-3 max-w-[200px]">
+                  <p className="text-gray-700 dark:text-gray-300 truncate">{v.chiefComplaint}</p>
+                </td>
+                <td className="px-4 py-3">
+                  <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full">
+                    {VISIT_TYPE_TH[v.visitType] ?? v.visitType}
+                  </span>
+                </td>
+                <td className="px-4 py-3"><VisitStatusBadge status={v.status} /></td>
+                <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{timeAgo(v.createdAt)}</td>
+                <td className="px-4 py-3">
+                  <Link href={`/staff/patients/${v.id}`}
+                    className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors flex items-center justify-center"
+                  >
+                    <ChevronRight size={16} className="text-gray-400" />
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StudentsTable({ students, loading, page }: { students: StudentUser[]; loading: boolean; page: number }) {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700">
+              {["#", "นักศึกษา", "รหัสนักศึกษา", "คณะ / ชั้นปี", "สถานะ", ""].map((h, i) => (
+                <th key={i} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
+            {loading ? (
+              <tr><td colSpan={6} className="py-12 text-center">
+                <Loader2 size={24} className="animate-spin text-gray-300 mx-auto" />
+              </td></tr>
+            ) : students.length === 0 ? (
+              <tr><td colSpan={6} className="py-12 text-center">
+                <GraduationCap size={28} className="mx-auto text-gray-200 mb-2" />
+                <p className="text-sm text-gray-400">ไม่พบนักศึกษา</p>
+              </td></tr>
+            ) : students.map((s, idx) => (
+              <tr key={s.id} className="hover:bg-gray-50/60 dark:hover:bg-gray-700/30 transition-colors">
+                <td className="px-4 py-3 text-xs text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      {s.firstName[0]}{s.lastName[0]}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-800 dark:text-white">{s.firstName} {s.lastName}</p>
+                      <p className="text-xs text-gray-400">{s.email}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  {s.studentId ? (
+                    <span className="font-mono text-xs bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-lg">
+                      {s.studentId}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-300">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {s.department || s.yearOfStudy ? (
+                    <div>
+                      {s.department && <p className="text-xs text-gray-700 dark:text-gray-300 truncate max-w-[160px]">{s.department}</p>}
+                      {s.yearOfStudy && <p className="text-xs text-gray-400">ชั้นปีที่ {s.yearOfStudy}</p>}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-300">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {s.isActive ? (
+                    <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 dark:bg-green-950/40 dark:text-green-400 px-2 py-0.5 rounded-full w-fit">
+                      <UserCheck size={11} /> ใช้งานได้
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-red-600 bg-red-50 dark:bg-red-950/40 dark:text-red-400 px-2 py-0.5 rounded-full w-fit">
+                      <UserX size={11} /> ปิดใช้งาน
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <Link
+                    href={`/staff/patients/new?patientId=${s.id}`}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    <Plus size={12} /> รับบริการ
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function VisitStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     waiting: "bg-yellow-100 text-yellow-700",
     in_treatment: "bg-blue-100 text-blue-700",

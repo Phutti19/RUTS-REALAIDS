@@ -225,9 +225,11 @@ export class ReportsService {
       topLocations: topLocRows.map((r) => ({ location: r.location, count: toInt(r.count) })),
       peakHours: peakHourRows.map((r) => ({ hour: toInt(r.hour), count: toInt(r.count) })),
       dailyTrend: dailyTrendRows.map((r) => ({
-        date: String(r.incident_date).split('T')[0],
-        count: toInt(r.incident_count),
-        avgResponseMinutes: toFloat(r.avg_response_time_minutes),
+        date: r.incident_date instanceof Date
+          ? r.incident_date.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+          : String(r.incident_date).split('T')[0],
+        count: toInt(r.total_incidents),
+        avgResponseMinutes: toFloat(r.avg_response_minutes),
       })),
     };
   }

@@ -20,14 +20,13 @@ import { api } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import {
   cn,
-  formatDateTime,
   timeAgo,
   severityColor,
   incidentTypeLabel,
   severityLabel,
   statusLabel,
 } from "@/lib/utils";
-import type { DashboardReport, Incident, Visit } from "@/types";
+import type { DashboardReport, Incident } from "@/types";
 
 interface QueueVisit {
   id: string;
@@ -50,8 +49,11 @@ export default function StaffDashboard() {
   const [queue, setQueue] = useState<QueueVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [isAlerting, setIsAlerting] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hasMounted = useRef(false);
+  const soundEnabledRef = useRef(true);
+  const alertIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load initial data in parallel
   const loadData = useCallback(async () => {
@@ -77,9 +79,14 @@ export default function StaffDashboard() {
     hasMounted.current = true;
   }, [user, loadData]);
 
-  // Play alert sound
-  const playAlert = useCallback(() => {
-    if (!soundEnabled) return;
+  // Keep soundEnabledRef in sync for use inside intervals
+  useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);
+
+  // Cleanup interval on unmount
+  useEffect(() => () => { if (alertIntervalRef.current) clearInterval(alertIntervalRef.current); }, []);
+
+  const playBeep = useCallback(() => {
+    if (!soundEnabledRef.current) return;
     try {
       if (!audioRef.current) {
         audioRef.current = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq4JNKih2n8/VqXtMMCqBpuLluYZSMC2LtOvbuIlTMy+Uvu/dvIlTNS6Tw+zgv41VMzCNwuvhv45SMjGIv+fhwJBVMTGIwenhwJFWMzGIwujiwJFWMzKJwuniwpBXMzCIwOniwpFXNTCIv+niwZFXNDCIwOniwpFXMzCIwOniwZFWNTCIwOniwpFWNDCIwOniwpFWMzCIwOniwpFWMzCIwOniwpFWMzCIwOniwpFWMzCIwOniwpFWMzCIwOniwpFW");
@@ -88,7 +95,35 @@ export default function StaffDashboard() {
       audioRef.current.currentTime = 0;
       audioRef.current.play().catch(() => {});
     } catch {}
-  }, [soundEnabled]);
+  }, []);
+
+  const startAlert = useCallback(() => {
+    if (alertIntervalRef.current) return; // already alerting
+    setIsAlerting(true);
+    playBeep();
+    alertIntervalRef.current = setInterval(playBeep, 2500);
+  }, [playBeep]);
+
+  const stopAlert = useCallback(() => {
+    setIsAlerting(false);
+    if (alertIntervalRef.current) {
+      clearInterval(alertIntervalRef.current);
+      alertIntervalRef.current = null;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, []);
+
+  // Mute/unmute without stopping alert state
+  const handleSoundToggle = useCallback(() => {
+    setSoundEnabled((s) => {
+      soundEnabledRef.current = !s;
+      if (s && audioRef.current) audioRef.current.pause();
+      return !s;
+    });
+  }, []);
 
   // Real-time: new incident
   useWebSocket<Incident>("incident:new", (incident) => {
@@ -106,18 +141,20 @@ export default function StaffDashboard() {
         },
       } : r
     );
-    playAlert();
-  }, [playAlert]);
+    startAlert();
+  }, [startAlert]);
 
   // Real-time: incident status change
   useWebSocket<{ incidentId: string; status: string }>("incident:status_update", (data) => {
-    setIncidents((prev) =>
-      prev.map((i) =>
-        i.id === data.incidentId ? { ...i, status: data.status as Incident["status"] } : i
-      ).filter((i) => i.status === "pending")
-    );
+    setIncidents((prev) => {
+      const updated = prev
+        .map((i) => i.id === data.incidentId ? { ...i, status: data.status as Incident["status"] } : i)
+        .filter((i) => i.status === "pending");
+      if (updated.length === 0) stopAlert();
+      return updated;
+    });
     loadData(); // refresh counts
-  }, [loadData]);
+  }, [loadData, stopAlert]);
 
   // Real-time: queue update
   useWebSocket("queue:update", () => {
@@ -144,14 +181,20 @@ export default function StaffDashboard() {
           </p>
         </div>
         <button
-          onClick={() => setSoundEnabled((s) => !s)}
+          onClick={handleSoundToggle}
           className={cn(
-            "p-2 rounded-xl border transition-colors",
-            soundEnabled
+            "p-2 rounded-xl border transition-all",
+            isAlerting && soundEnabled
+              ? "border-red-300 bg-red-50 text-red-500 animate-pulse"
+              : soundEnabled
               ? "border-blue-200 bg-blue-50 text-blue-600"
               : "border-gray-200 bg-gray-50 text-gray-400"
           )}
-          title={soundEnabled ? "ปิดเสียงแจ้งเตือน" : "เปิดเสียงแจ้งเตือน"}
+          title={
+            isAlerting
+              ? soundEnabled ? "มีเหตุฉุกเฉิน! (คลิกปิดเสียง)" : "มีเหตุฉุกเฉิน (เสียงปิดอยู่)"
+              : soundEnabled ? "ปิดเสียงแจ้งเตือน" : "เปิดเสียงแจ้งเตือน"
+          }
         >
           {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
         </button>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef, type FormEvent, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Eye,
   EyeOff,
@@ -17,13 +17,15 @@ import { useAuthContext } from "@/contexts/AuthContext";
 type UserType = "student" | "staff";
 type Step = "select" | "login";
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, logout, user, isLoading } = useAuthContext();
 
-  const [step, setStep] = useState<Step>("select");
+  const roleParam = searchParams.get("role") as UserType | null;
+  const [step, setStep] = useState<Step>(roleParam === "student" || roleParam === "staff" ? "login" : "select");
   const [stepDir, setStepDir] = useState<"forward" | "back">("forward");
-  const [userType, setUserType] = useState<UserType>("student");
+  const [userType, setUserType] = useState<UserType>(roleParam === "staff" ? "staff" : "student");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -276,13 +278,24 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              <div className="mt-4 text-center">
+              <div className="mt-4 flex items-center justify-center gap-4 text-sm">
                 <a
                   href="/forgot-password"
-                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                  className="text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                 >
                   ลืมรหัสผ่าน?
                 </a>
+                {!isStaff && (
+                  <>
+                    <span className="text-gray-300">|</span>
+                    <a
+                      href="/register"
+                      className="text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                    >
+                      สมัครสมาชิก
+                    </a>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -293,5 +306,13 @@ export default function LoginPage() {
         </p>
       </div>
     </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageInner />
+    </Suspense>
   );
 }

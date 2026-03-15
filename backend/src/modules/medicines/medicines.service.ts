@@ -291,6 +291,17 @@ export class MedicinesService {
       throw new BadRequestException('quantityChange cannot be 0');
     }
 
+    // Validate batch belongs to this medicine (if provided)
+    if (dto.batchId) {
+      const batch = await this.db.queryOne<{ id: string }>(
+        `SELECT id FROM medicine_batches WHERE id = $1 AND medicine_id = $2`,
+        [dto.batchId, medicineId],
+      );
+      if (!batch) {
+        throw new BadRequestException('Batch not found for this medicine.');
+      }
+    }
+
     const medicine = await this.db.transaction(async (client) => {
       // Update stock, prevent going below 0
       const stockResult = await client.query<{ stock_quantity: number }>(
@@ -302,12 +313,23 @@ export class MedicinesService {
       );
       const newStock = stockResult.rows[0].stock_quantity;
 
+      // If a batch is specified, also update its quantity
+      if (dto.batchId) {
+        await client.query(
+          `UPDATE medicine_batches
+           SET quantity = GREATEST(0, quantity + $1)
+           WHERE id = $2`,
+          [dto.quantityChange, dto.batchId],
+        );
+      }
+
       await client.query(
         `INSERT INTO medicine_stock_logs
-           (medicine_id, action, quantity_change, remaining_stock, performed_by, note)
-         VALUES ($1, 'adjusted', $2, $3, $4, $5)`,
+           (medicine_id, batch_id, action, quantity_change, remaining_stock, performed_by, note)
+         VALUES ($1, $2, 'adjusted', $3, $4, $5, $6)`,
         [
           medicineId,
+          dto.batchId ?? null,
           dto.quantityChange,
           newStock,
           performedBy,
@@ -323,7 +345,7 @@ export class MedicinesService {
     });
 
     this.logger.log(
-      `Stock adjusted: medicine=${medicineId} change=${dto.quantityChange} by=${performedBy}`,
+      `Stock adjusted: medicine=${medicineId} batch=${dto.batchId ?? 'none'} change=${dto.quantityChange} by=${performedBy}`,
     );
     return this.formatMedicine(medicine);
   }
@@ -432,6 +454,7 @@ export class MedicinesService {
       quantity: row.quantity,
       expiryDate: row.expiry_date,
       receivedAt: row.received_at,
+      note: row.note,
       isExpired: daysLeft <= 0,
       isExpiringSoon: daysLeft > 0 && daysLeft <= EXPIRING_SOON_DAYS,
       createdAt: row.created_at,
@@ -445,7 +468,8 @@ export class MedicinesService {
       batchId: row.batch_id,
       action: row.action,
       quantityChange: row.quantity_change,
-      notes: row.note,
+      remainingStock: row.remaining_stock,
+      note: row.note,
       createdAt: row.created_at,
     };
   }

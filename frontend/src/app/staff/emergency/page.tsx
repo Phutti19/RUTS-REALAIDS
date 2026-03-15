@@ -60,6 +60,7 @@ function EmergencyPageContent() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [infirmaryName, setInfirmaryName] = useState("ห้องพยาบาล");
 
   const loadIncidents = useCallback(async () => {
     const [pendingRes, inProgressRes, completedRes] = await Promise.all([
@@ -77,6 +78,9 @@ function EmergencyPageContent() {
 
   useEffect(() => {
     loadIncidents();
+    api.get<{ name: string | null }>("/settings/infirmary").then((res) => {
+      if (res.success && res.data?.name) setInfirmaryName(res.data.name);
+    });
   }, [loadIncidents]);
 
   // Open detail from URL param
@@ -161,10 +165,41 @@ function EmergencyPageContent() {
     }
   };
 
+  const [completedLimit, setCompletedLimit] = useState(10);
+  // Reset limit when switching to completed tab
+  useEffect(() => {
+    if (activeTab !== "completed") setCompletedLimit(10);
+  }, [activeTab]);
+
   const allMapIncidents = [
     ...incidents.pending,
     ...incidents.in_progress,
   ].filter((i) => i.latitude && i.longitude);
+
+  // Group completed incidents by date label
+  function getDateLabel(dateStr: string): string {
+    const d = new Date(dateStr);
+    const today = new Date();
+    const todayStr = today.toLocaleDateString("en-CA");
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const yStr = yesterday.toLocaleDateString("en-CA");
+    const dStr = d.toLocaleDateString("en-CA");
+    if (dStr === todayStr) return "วันนี้";
+    if (dStr === yStr) return "เมื่อวาน";
+    const diffDays = Math.floor((today.getTime() - d.getTime()) / 86400000);
+    if (diffDays <= 7) return "สัปดาห์นี้";
+    return d.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
+  }
+
+  const completedSliced = incidents.completed.slice(0, completedLimit);
+  const completedGroups: { label: string; items: Incident[] }[] = [];
+  completedSliced.forEach((inc) => {
+    const label = getDateLabel(inc.createdAt);
+    const g = completedGroups.find((g) => g.label === label);
+    if (g) g.items.push(inc);
+    else completedGroups.push({ label, items: [inc] });
+  });
 
   return (
     <div className="h-full flex flex-col gap-4">
@@ -207,6 +242,7 @@ function EmergencyPageContent() {
               incidents={allMapIncidents}
               selectedId={selectedIncident?.id}
               onSelectIncident={(inc) => openDetail(inc.id)}
+              infirmaryName={infirmaryName}
             />
           </div>
           {selectedIncident && (
@@ -269,6 +305,39 @@ function EmergencyPageContent() {
                   <Siren size={32} className="mx-auto text-gray-200 mb-3" />
                   <p className="text-gray-400 text-sm">ไม่มีเหตุการณ์</p>
                 </div>
+              ) : activeTab === "completed" ? (
+                <>
+                  {completedGroups.map(({ label, items }) => (
+                    <div key={label}>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1 mb-2">{label}</p>
+                      <div className="space-y-2">
+                        {items.map((incident) => (
+                          <IncidentCard
+                            key={incident.id}
+                            incident={incident}
+                            isSelected={selectedIncident?.id === incident.id}
+                            onClick={() =>
+                              selectedIncident?.id === incident.id
+                                ? setSelectedIncident(null)
+                                : openDetail(incident.id)
+                            }
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {incidents.completed.length > completedLimit && (
+                    <button
+                      onClick={() => setCompletedLimit((p) => p + 10)}
+                      className="w-full py-2.5 bg-white border border-gray-200 hover:border-gray-300 text-gray-500 hover:text-gray-700 text-sm rounded-xl transition-colors"
+                    >
+                      โหลดเพิ่มเติม ({incidents.completed.length - completedLimit} รายการ)
+                    </button>
+                  )}
+                  {incidents.completed.length > 0 && incidents.completed.length <= completedLimit && completedLimit > 10 && (
+                    <p className="text-center text-xs text-gray-400 py-2">แสดงทั้งหมด {incidents.completed.length} รายการ</p>
+                  )}
+                </>
               ) : (
                 incidents[activeTab].map((incident) => (
                   <IncidentCard

@@ -9,18 +9,23 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [devToken, setDevToken] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const res = await api.post("/auth/forgot-password", { email });
+    const res = await api.post<{ message: string; token?: string }>("/auth/forgot-password", { email });
     setLoading(false);
     if (res.success) {
       setSent(true);
+      if (res.data?.token) setDevToken(res.data.token);
     } else {
-      setError(res.message ?? "เกิดข้อผิดพลาด");
+      const firstDetail = Array.isArray(res.errors) && res.errors.length > 0
+        ? res.errors[0]
+        : null;
+      setError(firstDetail ?? res.message ?? "เกิดข้อผิดพลาด");
     }
   };
 
@@ -46,6 +51,17 @@ export default function ForgotPasswordPage() {
                 กรุณาตรวจสอบกล่องจดหมาย <br />
                 <span className="font-medium">{email}</span>
               </p>
+              {devToken && (
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-left">
+                  <p className="text-xs font-semibold text-yellow-700 mb-1">🛠 Dev Mode — ลิงก์รีเซ็ตรหัสผ่าน:</p>
+                  <Link
+                    href={`/reset-password?token=${devToken}`}
+                    className="text-xs text-blue-600 hover:underline break-all"
+                  >
+                    /reset-password?token={devToken}
+                  </Link>
+                </div>
+              )}
               <Link
                 href="/login"
                 className="mt-4 inline-block text-sm text-blue-600 hover:underline"

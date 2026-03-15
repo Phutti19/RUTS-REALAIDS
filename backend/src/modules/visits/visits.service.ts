@@ -3,8 +3,11 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
   Logger,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import bcrypt from 'bcryptjs';
 import { QueryResultRow } from 'pg';
 
 import { DatabaseService, PaginatedResult } from '../../database/db.service';
@@ -13,6 +16,7 @@ import { CreateVisitDto } from './dto/create-visit.dto';
 import { UpdateVisitDto } from './dto/update-visit.dto';
 import { ListVisitsDto } from './dto/list-visits.dto';
 import { DispenseMedicationDto } from './dto/dispense-medication.dto';
+import { RegisterWalkInPatientDto } from './dto/register-walkin-patient.dto';
 import {
   VisitRow,
   VisitDetailRow,
@@ -156,11 +160,14 @@ export class VisitsService {
     const dataSql = `
       SELECT pv.id, pv.patient_id, pv.staff_id, pv.incident_id, pv.visit_type,
              pv.chief_complaint, pv.diagnosis, pv.vital_signs, pv.treatment,
+             pv.illness_history, pv.wound_care, pv.rest_hours,
+             pv.consultation_types, pv.is_referred,
              pv.status, pv.created_at, COALESCE(pv.completed_at, pv.created_at) AS updated_at,
              u.first_name  AS patient_first_name,
              u.last_name   AS patient_last_name,
              u.email       AS patient_email,
              u.student_id  AS patient_student_id,
+             u.phone       AS patient_phone,
              su.first_name AS staff_first_name,
              su.last_name  AS staff_last_name
       FROM patient_visits pv
@@ -193,11 +200,14 @@ export class VisitsService {
     const row = await this.db.queryOne<VisitDetailRow>(
       `SELECT pv.id, pv.patient_id, pv.staff_id, pv.incident_id, pv.visit_type,
               pv.chief_complaint, pv.diagnosis, pv.vital_signs, pv.treatment,
+              pv.illness_history, pv.wound_care, pv.rest_hours,
+              pv.consultation_types, pv.is_referred,
               pv.status, pv.created_at, COALESCE(pv.completed_at, pv.created_at) AS updated_at,
               u.first_name  AS patient_first_name,
               u.last_name   AS patient_last_name,
               u.email       AS patient_email,
               u.student_id  AS patient_student_id,
+              u.phone       AS patient_phone,
               su.first_name AS staff_first_name,
               su.last_name  AS staff_last_name
        FROM patient_visits pv
@@ -241,9 +251,29 @@ export class VisitsService {
       fields.push(`treatment = $${idx++}`);
       values.push(dto.treatmentNotes ?? null);
     }
+    if (dto.illnessHistory !== undefined) {
+      fields.push(`illness_history = $${idx++}`);
+      values.push(dto.illnessHistory ?? null);
+    }
     if (dto.vitalSigns !== undefined) {
       fields.push(`vital_signs = $${idx++}`);
       values.push(JSON.stringify(dto.vitalSigns));
+    }
+    if (dto.woundCare !== undefined) {
+      fields.push(`wound_care = $${idx++}`);
+      values.push(dto.woundCare);
+    }
+    if (dto.restHours !== undefined) {
+      fields.push(`rest_hours = $${idx++}`);
+      values.push(dto.restHours ?? null);
+    }
+    if (dto.consultationTypes !== undefined) {
+      fields.push(`consultation_types = $${idx++}`);
+      values.push(dto.consultationTypes);
+    }
+    if (dto.isReferred !== undefined) {
+      fields.push(`is_referred = $${idx++}`);
+      values.push(dto.isReferred);
     }
     if (dto.status !== undefined) {
       fields.push(`status = $${idx++}::visit_status`);
@@ -284,11 +314,14 @@ export class VisitsService {
     const rows = await this.db.queryMany<VisitDetailRow>(
       `SELECT pv.id, pv.patient_id, pv.staff_id, pv.incident_id, pv.visit_type,
               pv.chief_complaint, pv.diagnosis, pv.vital_signs, pv.treatment,
+              pv.illness_history, pv.wound_care, pv.rest_hours,
+              pv.consultation_types, pv.is_referred,
               pv.status, pv.created_at, COALESCE(pv.completed_at, pv.created_at) AS updated_at,
               u.first_name  AS patient_first_name,
               u.last_name   AS patient_last_name,
               u.email       AS patient_email,
               u.student_id  AS patient_student_id,
+              u.phone       AS patient_phone,
               su.first_name AS staff_first_name,
               su.last_name  AS staff_last_name
        FROM patient_visits pv
@@ -507,6 +540,11 @@ export class VisitsService {
       diagnosis: row.diagnosis,
       vitalSigns: row.vital_signs,
       treatmentNotes: row.treatment,
+      illnessHistory: row.illness_history ?? null,
+      woundCare: row.wound_care ?? false,
+      restHours: row.rest_hours != null ? parseFloat(row.rest_hours) : null,
+      consultationTypes: row.consultation_types ?? [],
+      isReferred: row.is_referred ?? false,
       status: row.status,
       patient: {
         id: row.patient_id,
@@ -514,6 +552,7 @@ export class VisitsService {
         lastName: row.patient_last_name,
         email: row.patient_email,
         studentId: row.patient_student_id,
+        phone: row.patient_phone ?? null,
       },
       staff: {
         id: row.staff_id,
@@ -559,5 +598,55 @@ export class VisitsService {
       dosageInstruction: row.dosage_instruction,
       createdAt: row.created_at,
     };
+  }
+
+  // ── Walk-in patient registration ──────────────────────────────────────────
+
+  /**
+   * Create a new student account for a walk-in patient who has never registered.
+   * Password is set to the student ID (plain text → bcrypt-hashed).
+   * Returns the new user so the caller can immediately open a visit.
+   */
+  async registerWalkInPatient(dto: RegisterWalkInPatientDto): Promise<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    studentId: string;
+    email: string;
+    role: string;
+  }> {
+    const email = dto.email ?? `${dto.studentId}@student.ruts.ac.th`;
+
+    // Check for duplicate student_id
+    const dupStudentId = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM users WHERE student_id = $1`,
+      [dto.studentId],
+    );
+    if (dupStudentId) throw new ConflictException('รหัสนักศึกษานี้มีในระบบแล้ว');
+
+    // Check for duplicate email
+    const dupEmail = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM users WHERE email = $1`,
+      [email],
+    );
+    if (dupEmail) throw new ConflictException('อีเมลนี้มีในระบบแล้ว');
+
+    const passwordHash = await bcrypt.hash(dto.studentId, 12);
+    const id = randomUUID();
+
+    await this.db.query(
+      `INSERT INTO users (id, student_id, email, password_hash, first_name, last_name, phone, role, title, department, year_of_study, birth_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'student', $8, $9, $10, $11)`,
+      [id, dto.studentId, email, passwordHash, dto.firstName, dto.lastName, dto.phone ?? null,
+       dto.title, dto.department ?? null, dto.yearOfStudy ?? null, dto.birthDate ?? null],
+    );
+
+    // Create empty health profile so joins don't fail
+    await this.db.query(
+      `INSERT INTO student_health_profiles (user_id) VALUES ($1) ON CONFLICT DO NOTHING`,
+      [id],
+    );
+
+    return { id, firstName: dto.firstName, lastName: dto.lastName, studentId: dto.studentId, email, role: 'student' };
   }
 }

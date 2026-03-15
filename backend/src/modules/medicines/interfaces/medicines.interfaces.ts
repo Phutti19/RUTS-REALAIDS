@@ -30,6 +30,7 @@ export interface MedicineStockLogRow {
   batch_id: string | null;
   action: string;
   quantity_change: number;
+  remaining_stock: number;
   note: string | null;
   created_at: Date;
 }
@@ -86,6 +87,7 @@ export interface MedicineBatch {
   quantity: number;
   expiryDate: Date;
   receivedAt: Date;
+  note: string | null;
   isExpired: boolean;
   isExpiringSoon: boolean;
   createdAt: Date;
@@ -97,7 +99,8 @@ export interface StockLog {
   batchId: string | null;
   action: string;
   quantityChange: number;
-  notes: string | null;
+  remainingStock: number;
+  note: string | null;
   createdAt: Date;
 }
 

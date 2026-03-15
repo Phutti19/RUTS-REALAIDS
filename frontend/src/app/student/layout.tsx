@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { Home, Calendar, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthContext } from "@/contexts/AuthContext";
-import { ThemeToggle } from "@/components/shared/ThemeToggle";
 
 const NAV_ITEMS = [
   { href: "/student/dashboard", label: "หน้าหลัก", icon: Home },
@@ -23,12 +22,25 @@ export default function StudentLayout({
   const router = useRouter();
   const { user, isLoading } = useAuthContext();
 
-  // Redirect if not a student after auth resolves
   useEffect(() => {
-    if (!isLoading && user && user.role !== "student") {
+    if (isLoading) return;
+    if (!user) {
+      router.replace("/login");
+    } else if (user.role !== "student") {
       router.replace("/staff/dashboard");
     }
   }, [isLoading, user, router]);
+
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-400">กำลังโหลด...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="portal-page min-h-screen bg-gray-200 dark:bg-gray-950 pb-20">
@@ -70,9 +82,6 @@ export default function StudentLayout({
               </Link>
             );
           })}
-          <div className="px-2">
-            <ThemeToggle size={18} />
-          </div>
         </div>
       </nav>
     </div>

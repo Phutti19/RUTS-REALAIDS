@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min, Max } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, Min, Max } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class AdjustStockDto {
@@ -8,6 +8,11 @@ export class AdjustStockDto {
   @Min(-1_000_000)
   @Max(1_000_000)
   quantityChange: number;
+
+  /** Optional: link this adjustment to a specific batch */
+  @IsOptional()
+  @IsUUID()
+  batchId?: string;
 
   @IsOptional()
   @IsString()

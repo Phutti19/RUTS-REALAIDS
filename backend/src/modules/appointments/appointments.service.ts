@@ -285,7 +285,7 @@ export class AppointmentsService {
         `INSERT INTO appointments (patient_id, staff_id, slot_id, appointment_date, appointment_time, reason, status, notes)
          VALUES ($1, $2, $3, $4, $5, $6, 'scheduled', $7)
          RETURNING id`,
-        [patientId, slot.staff_id, dto.slotId, dto.date, slot.start_time, dto.notes ?? '', dto.notes ?? null],
+        [patientId, slot.staff_id, dto.slotId, dto.date, slot.start_time, dto.reason, dto.notes ?? null],
       );
       const apptId = apptResult.rows[0].id;
 

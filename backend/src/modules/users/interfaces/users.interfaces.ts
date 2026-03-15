@@ -12,6 +12,13 @@ export interface UserRow {
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
+  // Patient demographic fields (nullable — added by migration)
+  national_id: string | null;
+  title: string | null;
+  birth_date: Date | null;
+  department: string | null;
+  year_of_study: number | null;
+  position: string | null;
 }
 
 export type BloodType = 'A' | 'B' | 'AB' | 'O' | 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
@@ -42,6 +49,13 @@ export interface UserProfile {
   role: 'student' | 'staff' | 'admin';
   isActive: boolean;
   createdAt: Date;
+  // Patient demographics
+  nationalId: string | null;
+  title: string | null;
+  birthDate: Date | null;
+  department: string | null;
+  yearOfStudy: number | null;
+  position: string | null;
 }
 
 export interface HealthProfile {

@@ -34,6 +34,7 @@ export interface ApiResponse<T = unknown> {
   data?: T;
   error?: string;
   message?: string;
+  errors?: string[];
   total?: number;
   page?: number;
   limit?: number;
@@ -66,8 +67,8 @@ async function request<T>(
     credentials: "include",
   });
 
-  // If 401, try refreshing once
-  if (res.status === 401 && token) {
+  // If 401, try refreshing once (even if we had no token — page may have just loaded)
+  if (res.status === 401) {
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers["Authorization"] = `Bearer ${newToken}`;
@@ -76,14 +77,25 @@ async function request<T>(
         headers,
         credentials: "include",
       });
-      const retryData = await retry.json();
+      if (retry.status === 204 || retry.headers.get("content-length") === "0") {
+        return { success: true } as ApiResponse<T>;
+      }
+      const retryText = await retry.text();
+      if (!retryText) return { success: true } as ApiResponse<T>;
+      const retryData = JSON.parse(retryText);
       return retryData as ApiResponse<T>;
     }
     // Refresh failed — clear token
     setAccessToken(null);
   }
 
-  const data = await res.json();
+  // 204 No Content or empty body — return success with no data
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return { success: true } as ApiResponse<T>;
+  }
+  const text = await res.text();
+  if (!text) return { success: true } as ApiResponse<T>;
+  const data = JSON.parse(text);
   return data as ApiResponse<T>;
 }
 

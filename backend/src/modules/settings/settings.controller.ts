@@ -27,8 +27,10 @@ export class SettingsController {
    * GET /api/v1/settings/infirmary
    * Returns infirmary info (name, lat, lng, phone).
    * Declared BEFORE :key to avoid route collision.
+   * Accessible by both staff and admin (used on emergency map).
    */
   @Get('infirmary')
+  @Roles('staff', 'admin')
   async getInfirmaryInfo() {
     const data = await this.settingsService.getInfirmaryInfo();
     return { success: true, data };

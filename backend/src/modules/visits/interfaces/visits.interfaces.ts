@@ -25,6 +25,12 @@ export interface VisitRow {
   status: string;
   created_at: Date;
   updated_at: Date;
+  // Clinical fields added by migration
+  illness_history: string | null;
+  wound_care: boolean;
+  rest_hours: string | null; // NUMERIC returned as string by pg driver
+  consultation_types: string[];
+  is_referred: boolean;
 }
 
 /** Extended row from JOIN (includes patient + staff name columns) */
@@ -33,6 +39,7 @@ export interface VisitDetailRow extends VisitRow {
   patient_last_name: string;
   patient_email: string;
   patient_student_id: string | null;
+  patient_phone: string | null;
   staff_first_name: string;
   staff_last_name: string;
 }
@@ -74,12 +81,18 @@ export interface VisitSummary {
 export interface Visit extends VisitSummary {
   vitalSigns: VitalSigns | null;
   treatmentNotes: string | null;
+  illnessHistory: string | null;
+  woundCare: boolean;
+  restHours: number | null;
+  consultationTypes: string[];
+  isReferred: boolean;
   patient: {
     id: string;
     firstName: string;
     lastName: string;
     email: string;
     studentId: string | null;
+    phone: string | null;
   };
   staff: {
     id: string;

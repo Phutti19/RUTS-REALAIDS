@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Put,
+  Patch,
   Body,
   Param,
   Query,
@@ -18,6 +19,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateHealthProfileDto } from './dto/update-health-profile.dto';
+import { UpdatePatientProfileDto } from './dto/update-patient-profile.dto';
 import { ListUsersDto } from './dto/list-users.dto';
 
 @Controller('users')
@@ -119,6 +121,23 @@ export class UsersController {
   }
 
   /**
+   * PUT /api/v1/users/:id/health-profile
+   * Staff updates a patient's health profile (blood type, allergies, etc.)
+   * Available to: staff, admin only
+   */
+  @Put(':id/health-profile')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RolesGuard)
+  @Roles('staff', 'admin')
+  async updateHealthProfileById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateHealthProfileDto,
+  ) {
+    const data = await this.usersService.updateHealthProfile(id, dto);
+    return { success: true, data };
+  }
+
+  /**
    * GET /api/v1/users/:id
    * Get a specific user's profile by UUID.
    * Available to: staff, admin only
@@ -128,6 +147,24 @@ export class UsersController {
   @Roles('staff', 'admin')
   async getUserById(@Param('id', ParseUUIDPipe) id: string) {
     const data = await this.usersService.getUserById(id);
+    return { success: true, data };
+  }
+
+  /**
+   * PATCH /api/v1/users/:id
+   * Staff updates a patient's demographic info (national_id, title, birth_date,
+   * department, year_of_study, position, phone) collected at intake time.
+   * Available to: staff, admin only
+   */
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RolesGuard)
+  @Roles('staff', 'admin')
+  async updatePatientProfile(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdatePatientProfileDto,
+  ) {
+    const data = await this.usersService.updatePatientProfile(id, dto);
     return { success: true, data };
   }
 }

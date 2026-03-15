@@ -28,6 +28,13 @@ export interface User {
   role: UserRole;
   isActive: boolean;
   createdAt: string;
+  // Patient demographic fields (added by migration)
+  nationalId: string | null;
+  title: string | null;
+  birthDate: string | null;
+  department: string | null;
+  yearOfStudy: number | null;
+  position: string | null;
 }
 
 export interface HealthProfile {
@@ -125,7 +132,12 @@ export interface Visit {
   diagnosis: string | null;
   /** Backend field name: treatmentNotes (maps to treatment column) */
   treatmentNotes: string | null;
+  illnessHistory: string | null;
   vitalSigns: VitalSigns | null;
+  woundCare: boolean;
+  restHours: number | null;
+  consultationTypes: string[];
+  isReferred: boolean;
   status: VisitStatus;
   /** Nested patient info returned by backend */
   patient: {
@@ -134,6 +146,7 @@ export interface Visit {
     lastName: string;
     email: string;
     studentId: string | null;
+    phone: string | null;
   };
   /** Nested staff info returned by backend */
   staff: {
@@ -151,6 +164,7 @@ export interface VisitMedication {
   medicineId: string;
   medicineName: string;
   batchId: string;
+  batchNumber: string;
   quantity: number;
   dosageInstruction: string | null;
   createdAt: string;

@@ -9,6 +9,7 @@ interface Props {
   selectedId?: string;
   infirmaryLat?: number;
   infirmaryLng?: number;
+  infirmaryName?: string;
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -24,6 +25,7 @@ export function EmergencyMap({
   selectedId,
   infirmaryLat = parseFloat(process.env.NEXT_PUBLIC_MAP_CENTER_LAT ?? "7.1907"),
   infirmaryLng = parseFloat(process.env.NEXT_PUBLIC_MAP_CENTER_LNG ?? "100.5930"),
+  infirmaryName = "ห้องพยาบาล",
 }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -76,7 +78,7 @@ export function EmergencyMap({
 
       L.marker([infirmaryLat, infirmaryLng], { icon: infirmaryIcon })
         .addTo(map)
-        .bindPopup("<b>ห้องพยาบาล มทร.ศรีวิชัย</b>")
+        .bindPopup(`<b>${infirmaryName}</b>`)
         .openPopup();
 
       leafletRef.current = map;

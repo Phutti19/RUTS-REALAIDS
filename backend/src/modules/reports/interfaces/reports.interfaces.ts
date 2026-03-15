@@ -24,12 +24,12 @@ export interface DashboardReport {
 
 /**
  * Row from v_daily_incident_stats view.
- * Expected columns: incident_date, incident_count, avg_response_time_minutes
+ * Actual columns: incident_date, total_incidents, avg_response_minutes
  */
 export interface DailyStatRow {
   incident_date: Date | string;
-  incident_count: number | string;
-  avg_response_time_minutes: number | string | null;
+  total_incidents: number | string;
+  avg_response_minutes: number | string | null;
 }
 
 export interface IncidentStatsReport {

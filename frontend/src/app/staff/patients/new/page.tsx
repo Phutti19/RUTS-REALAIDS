@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Search, Loader2, User, AlertCircle } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, Search, Loader2, User, AlertCircle, UserPlus, X } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -25,13 +25,42 @@ const VISIT_TYPES = [
 
 export default function NewVisitPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<1 | 2>(1);
 
   // Step 1: select patient
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<UserResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false); // has the user typed ≥2 chars?
   const [selected, setSelected] = useState<UserResult | null>(null);
+
+  // Pre-select patient from ?patientId= query param
+  useEffect(() => {
+    const patientId = searchParams.get("patientId");
+    if (!patientId) return;
+    api.get<UserResult>(`/users/${patientId}`).then((res) => {
+      if (res.success && res.data) {
+        const u = res.data as unknown as UserResult;
+        setSelected(u);
+        setSearch(`${u.firstName} ${u.lastName}`);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Inline registration form
+  const [showRegForm, setShowRegForm] = useState(false);
+  const [regTitle, setRegTitle] = useState("นาย");
+  const [regFirstName, setRegFirstName] = useState("");
+  const [regLastName, setRegLastName] = useState("");
+  const [regStudentId, setRegStudentId] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regDepartment, setRegDepartment] = useState("");
+  const [regYearOfStudy, setRegYearOfStudy] = useState("");
+  const [regBirthDate, setRegBirthDate] = useState("");
+  const [registering, setRegistering] = useState(false);
+  const [regError, setRegError] = useState("");
 
   // Step 2: visit info
   const [visitType, setVisitType] = useState("walk_in");
@@ -41,17 +70,55 @@ export default function NewVisitPage() {
 
   // Debounced patient search
   useEffect(() => {
-    if (search.length < 2) { setResults([]); return; }
+    if (search.length < 2) { setResults([]); setSearched(false); return; }
     const t = setTimeout(async () => {
       setSearching(true);
+      setSearched(false);
       const res = await api.get<UserResult[]>(`/users?search=${encodeURIComponent(search)}&role=student&limit=8`);
       if (res.success) {
         setResults(Array.isArray(res.data) ? (res.data as unknown as UserResult[]) : []);
       }
+      setSearched(true);
       setSearching(false);
     }, 400);
     return () => clearTimeout(t);
   }, [search]);
+
+  const selectPatient = (u: UserResult) => {
+    setSelected(u);
+    setSearch(`${u.firstName} ${u.lastName}`);
+    setResults([]);
+    setShowRegForm(false);
+    setRegError("");
+  };
+
+  const handleRegister = async () => {
+    if (!regFirstName.trim() || !regLastName.trim() || !regStudentId.trim()) return;
+    setRegistering(true);
+    setRegError("");
+    const res = await api.post<UserResult>("/visits/register-patient", {
+      title: regTitle,
+      firstName: regFirstName.trim(),
+      lastName: regLastName.trim(),
+      studentId: regStudentId.trim(),
+      phone: regPhone.trim() || undefined,
+      department: regDepartment.trim() || undefined,
+      yearOfStudy: regYearOfStudy ? parseInt(regYearOfStudy) : undefined,
+      birthDate: regBirthDate || undefined,
+    });
+    setRegistering(false);
+    if (res.success && res.data) {
+      selectPatient(res.data as UserResult);
+    } else {
+      setRegError(res.message ?? "เกิดข้อผิดพลาด");
+    }
+  };
+
+  const openRegForm = () => {
+    setShowRegForm(true);
+    // Pre-fill studentId if search looks like a numeric ID
+    if (/^\d{4,}$/.test(search.trim())) setRegStudentId(search.trim());
+  };
 
   const handleCreate = async () => {
     if (!selected || !chiefComplaint.trim()) return;
@@ -95,11 +162,13 @@ export default function NewVisitPage() {
         /* Step 1: Select patient */
         <div className="bg-white rounded-2xl shadow-sm p-5 space-y-4">
           <h2 className="font-semibold text-gray-800">เลือกผู้ป่วย</h2>
+
+          {/* Search box */}
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setSelected(null); setShowRegForm(false); }}
               placeholder="ค้นหาชื่อ หรือ รหัสนักศึกษา..."
               autoFocus
               className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -109,13 +178,13 @@ export default function NewVisitPage() {
             )}
           </div>
 
-          {/* Results */}
+          {/* Search results */}
           {results.length > 0 && (
             <div className="space-y-1.5">
               {results.map((u) => (
                 <button
                   key={u.id}
-                  onClick={() => { setSelected(u); setSearch(`${u.firstName} ${u.lastName}`); setResults([]); }}
+                  onClick={() => selectPatient(u)}
                   className={cn(
                     "w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all",
                     selected?.id === u.id
@@ -139,17 +208,176 @@ export default function NewVisitPage() {
             </div>
           )}
 
+          {/* Not found → offer quick register */}
+          {searched && !searching && results.length === 0 && !selected && !showRegForm && (
+            <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 text-center space-y-2">
+              <p className="text-sm text-gray-500">ไม่พบผู้ใช้ในระบบ</p>
+              <button
+                onClick={openRegForm}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium"
+              >
+                <UserPlus size={14} />
+                ลงทะเบียนผู้ป่วยใหม่
+              </button>
+            </div>
+          )}
+
+          {/* Inline registration form */}
+          {showRegForm && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-blue-800 flex items-center gap-1.5">
+                  <UserPlus size={14} />
+                  ลงทะเบียนผู้ป่วยใหม่
+                </p>
+                <button onClick={() => { setShowRegForm(false); setRegError(""); setRegTitle("นาย"); setRegFirstName(""); setRegLastName(""); setRegStudentId(""); setRegPhone(""); setRegDepartment(""); setRegYearOfStudy(""); setRegBirthDate(""); }}
+                  className="text-blue-400 hover:text-blue-600">
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* Title + First name + Last name */}
+              <div className="grid grid-cols-[auto_1fr_1fr] gap-2">
+                <div>
+                  <label className="text-xs text-blue-700 font-medium mb-1 block">คำนำหน้า *</label>
+                  <select
+                    value={regTitle}
+                    onChange={(e) => setRegTitle(e.target.value)}
+                    className="px-2 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  >
+                    <option value="นาย">นาย</option>
+                    <option value="นาง">นาง</option>
+                    <option value="นางสาว">นางสาว</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-blue-700 font-medium mb-1 block">ชื่อ *</label>
+                  <input
+                    value={regFirstName}
+                    onChange={(e) => setRegFirstName(e.target.value)}
+                    placeholder="ชื่อจริง"
+                    className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-blue-700 font-medium mb-1 block">นามสกุล *</label>
+                  <input
+                    value={regLastName}
+                    onChange={(e) => setRegLastName(e.target.value)}
+                    placeholder="นามสกุล"
+                    className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-blue-700 font-medium mb-1 block">
+                  รหัสนักศึกษา * <span className="font-normal text-blue-500">(ใช้เป็นรหัสผ่านตั้งต้น)</span>
+                </label>
+                <input
+                  value={regStudentId}
+                  onChange={(e) => setRegStudentId(e.target.value)}
+                  placeholder="เช่น 6501012345"
+                  className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                />
+              </div>
+
+              {/* Department + Year */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-blue-700 font-medium mb-1 block">คณะ/สาขา</label>
+                  <input
+                    value={regDepartment}
+                    onChange={(e) => setRegDepartment(e.target.value)}
+                    placeholder="เช่น วิศวกรรมศาสตร์"
+                    className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-blue-700 font-medium mb-1 block">ชั้นปี</label>
+                  <select
+                    value={regYearOfStudy}
+                    onChange={(e) => setRegYearOfStudy(e.target.value)}
+                    className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  >
+                    <option value="">-- ไม่ระบุ --</option>
+                    {[1,2,3,4,5,6].map((y) => (
+                      <option key={y} value={y}>ปี {y}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Birth date + auto age */}
+              <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+                <div>
+                  <label className="text-xs text-blue-700 font-medium mb-1 block">วันเกิด (ถ้ามี)</label>
+                  <input
+                    type="date"
+                    value={regBirthDate}
+                    onChange={(e) => setRegBirthDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  />
+                </div>
+                <div className="bg-white border border-blue-200 rounded-xl px-3 py-2 text-center min-w-[64px]">
+                  <p className="text-xs text-blue-500">อายุ</p>
+                  <p className="text-sm font-bold text-blue-800">
+                    {regBirthDate
+                      ? `${Math.floor((Date.now() - new Date(regBirthDate).getTime()) / (365.25 * 24 * 3600 * 1000))} ปี`
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-blue-700 font-medium mb-1 block">เบอร์โทร (ถ้ามี)</label>
+                <input
+                  value={regPhone}
+                  onChange={(e) => setRegPhone(e.target.value)}
+                  placeholder="0xx-xxx-xxxx"
+                  className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                />
+              </div>
+
+              {regError && (
+                <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                  <AlertCircle size={13} /> {regError}
+                </div>
+              )}
+
+              <button
+                onClick={handleRegister}
+                disabled={registering || !regFirstName.trim() || !regLastName.trim() || !regStudentId.trim()}
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5"
+              >
+                {registering ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
+                {registering ? "กำลังลงทะเบียน..." : "ลงทะเบียนและเลือก"}
+              </button>
+
+              <p className="text-xs text-blue-600 text-center">
+                อีเมลจะถูกสร้างอัตโนมัติ · นักศึกษาสามารถเปลี่ยนรหัสผ่านได้ภายหลัง
+              </p>
+            </div>
+          )}
+
+          {/* Selected patient summary */}
           {selected && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center gap-3">
               <div className="w-9 h-9 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0">
                 <User size={16} className="text-blue-700" />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-blue-800">
                   {selected.firstName} {selected.lastName}
                 </p>
                 <p className="text-xs text-blue-600">{selected.studentId} · {selected.email}</p>
               </div>
+              <button
+                onClick={() => { setSelected(null); setSearch(""); setSearched(false); }}
+                className="text-blue-400 hover:text-blue-600 flex-shrink-0"
+              >
+                <X size={15} />
+              </button>
             </div>
           )}
 
@@ -170,7 +398,7 @@ export default function NewVisitPage() {
               {selected?.firstName} {selected?.lastName}
             </p>
             <button
-              onClick={() => { setStep(1); setSelected(null); setSearch(""); }}
+              onClick={() => { setStep(1); setSelected(null); setSearch(""); setSearched(false); }}
               className="ml-auto text-xs text-blue-500 hover:text-blue-700"
             >
               เปลี่ยน

@@ -1,20 +1,32 @@
 "use client";
 
-import { useState, useEffect, use, useRef } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Printer, Loader2, Save, AlertCircle } from "lucide-react";
 import { api } from "@/lib/api";
-import { cn, formatDate } from "@/lib/utils";
-import type { Certificate } from "@/types";
+import { formatDate } from "@/lib/utils";
+import type { Certificate, Visit, User as UserType, InfirmaryInfo } from "@/types";
+
+function calcAge(birthDate: string | null): string {
+  if (!birthDate) return "—";
+  return `${Math.floor((Date.now() - new Date(birthDate).getTime()) / (365.25 * 24 * 3600 * 1000))} ปี`;
+}
 
 export default function CertificatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const printRef = useRef<HTMLDivElement>(null);
   const [certificate, setCertificate] = useState<Certificate | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [notFound, setNotFound] = useState(false);
+
+  // Extra patient/visit info
+  const [visitDate, setVisitDate] = useState<string>("");
+  const [patientTitle, setPatientTitle] = useState<string>("");
+  const [patientAge, setPatientAge] = useState<string>("—");
+  const [patientDept, setPatientDept] = useState<string>("");
+  const [infirmaryPhone, setInfirmaryPhone] = useState<string>("");
+  const [infirmaryName, setInfirmaryName] = useState<string>("ห้องพยาบาล มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย");
 
   // Create form
   const [restDays, setRestDays] = useState(1);
@@ -23,15 +35,40 @@ export default function CertificatePage({ params }: { params: Promise<{ id: stri
   const [diagnosisText, setDiagnosisText] = useState("");
 
   useEffect(() => {
-    api.get<Certificate>(`/visits/${id}/certificate`).then((res) => {
-      if (res.success && res.data) {
-        setCertificate(res.data);
+    Promise.all([
+      api.get<Certificate>(`/visits/${id}/certificate`),
+      api.get<Visit>(`/visits/${id}`),
+      api.get<InfirmaryInfo>("/settings/infirmary"),
+    ]).then(async ([certRes, visitRes, infirmaryRes]) => {
+      if (certRes.success && certRes.data) {
+        setCertificate(certRes.data);
       } else {
         setNotFound(true);
       }
+
+      if (visitRes.success && visitRes.data) {
+        const v = visitRes.data;
+        setVisitDate(v.createdAt);
+        if (!diagnosisText && v.diagnosis) setDiagnosisText(v.diagnosis);
+
+        const userRes = await api.get<UserType>(`/users/${v.patientId}`);
+        if (userRes.success && userRes.data) {
+          const u = userRes.data as UserType;
+          setPatientTitle(u.title ?? "");
+          setPatientAge(calcAge(u.birthDate ?? null));
+          setPatientDept(u.department ?? "");
+        }
+      }
+
+      if (infirmaryRes.success && infirmaryRes.data) {
+        const info = infirmaryRes.data as InfirmaryInfo;
+        if (info.name) setInfirmaryName(info.name);
+        if (info.phone) setInfirmaryPhone(info.phone);
+      }
+
       setLoading(false);
     });
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const createCertificate = async () => {
     setCreating(true);
@@ -78,7 +115,7 @@ export default function CertificatePage({ params }: { params: Promise<{ id: stri
             onClick={handlePrint}
             className="ml-auto flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold"
           >
-            <Printer size={15} /> พิมพ์
+            <Printer size={15} /> ดาวน์โหลด / พิมพ์ PDF
           </button>
         )}
       </div>
@@ -153,16 +190,19 @@ export default function CertificatePage({ params }: { params: Promise<{ id: stri
       {/* Certificate preview */}
       {certificate && (
         <div
-          ref={printRef}
-          className="bg-white shadow-sm rounded-2xl p-8 print:shadow-none print:rounded-none print:p-0"
+          id="certificate-for-print"
+          className="bg-white shadow-sm rounded-2xl p-8"
           style={{ fontFamily: "Sarabun, Arial, sans-serif" }}
         >
           {/* Header */}
           <div className="text-center border-b-2 border-gray-800 pb-4 mb-6">
             <h1 className="text-2xl font-bold text-gray-900">ใบรับรองแพทย์</h1>
             <p className="text-sm text-gray-600 mt-1">MEDICAL CERTIFICATE</p>
-            <p className="text-sm font-semibold mt-2">ห้องพยาบาล มหาวิทยาลัยเทคโนโลยีราชมงคลศรีวิชัย</p>
+            <p className="text-sm font-semibold mt-2">{infirmaryName}</p>
             <p className="text-xs text-gray-500">Rajamangala University of Technology Srivijaya Infirmary</p>
+            {infirmaryPhone && (
+              <p className="text-xs text-gray-500 mt-0.5">โทร. {infirmaryPhone}</p>
+            )}
           </div>
 
           {/* Certificate number */}
@@ -177,22 +217,50 @@ export default function CertificatePage({ params }: { params: Promise<{ id: stri
             </p>
           </div>
 
-          {/* Patient info */}
-          <div className="mb-6 space-y-2">
-            <p className="text-sm">
-              ข้าพเจ้า{" "}
-              <span className="font-bold border-b border-dotted border-gray-500 px-8">
-                {certificate.issuedByName}
+          {/* Examiner */}
+          <p className="text-sm mb-4">
+            ข้าพเจ้า{" "}
+            <span className="font-bold border-b border-dotted border-gray-500 px-6">
+              {certificate.issuedByName}
+            </span>
+            {" "}ตำแหน่ง เจ้าหน้าที่พยาบาล ได้ทำการตรวจโรคให้แก่
+          </p>
+
+          {/* Patient info block */}
+          <div className="bg-gray-50 rounded-xl p-4 mb-5 space-y-1.5 text-sm">
+            <div className="flex flex-wrap gap-x-6 gap-y-1">
+              <span>
+                <span className="text-gray-500">ชื่อ-นามสกุล: </span>
+                <span className="font-bold">
+                  {patientTitle && <span className="font-normal text-gray-600">{patientTitle} </span>}
+                  {certificate.patientName}
+                </span>
               </span>
-              {" "}ได้ทำการตรวจโรคให้แก่
-            </p>
-            <p className="text-sm">
-              <span className="text-gray-500">ชื่อ-นามสกุล: </span>
-              <span className="font-bold">{certificate.patientName}</span>
+              <span>
+                <span className="text-gray-500">อายุ: </span>
+                <span className="font-semibold">{patientAge}</span>
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-x-6 gap-y-1">
               {certificate.studentId && (
-                <span className="ml-4 text-gray-500">รหัสนักศึกษา: <span className="font-bold text-gray-800">{certificate.studentId}</span></span>
+                <span>
+                  <span className="text-gray-500">รหัสนักศึกษา: </span>
+                  <span className="font-semibold">{certificate.studentId}</span>
+                </span>
               )}
-            </p>
+              {patientDept && (
+                <span>
+                  <span className="text-gray-500">คณะ/หน่วยงาน: </span>
+                  <span className="font-semibold">{patientDept}</span>
+                </span>
+              )}
+            </div>
+            {visitDate && (
+              <span>
+                <span className="text-gray-500">วันที่ตรวจรักษา: </span>
+                <span className="font-semibold">{formatDate(visitDate)}</span>
+              </span>
+            )}
           </div>
 
           {/* Diagnosis */}
@@ -224,10 +292,13 @@ export default function CertificatePage({ params }: { params: Promise<{ id: stri
 
           {/* Signature */}
           <div className="mt-10 flex justify-end">
-            <div className="text-center w-48">
+            <div className="text-center w-52">
+              <div className="mb-8 border-b border-dashed border-gray-300">
+                <p className="text-xs text-gray-400 pb-1">(ลายมือชื่อ / Signature)</p>
+              </div>
               <div className="border-t border-gray-800 pt-2">
                 <p className="text-sm font-semibold">{certificate.issuedByName}</p>
-                <p className="text-xs text-gray-500">ผู้ออกใบรับรอง</p>
+                <p className="text-xs text-gray-500">เจ้าหน้าที่พยาบาล</p>
                 <p className="text-xs text-gray-500">{formatDate(certificate.issuedAt)}</p>
               </div>
             </div>
@@ -242,13 +313,15 @@ export default function CertificatePage({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
-      {/* Print styles */}
+      {/* Print styles (for direct window.print fallback) */}
       <style>{`
         @media print {
           body * { visibility: hidden; }
-          .print\\:shadow-none, .print\\:shadow-none * { visibility: visible; }
-          .print\\:shadow-none { position: absolute; top: 0; left: 0; width: 100%; }
-          .print\\:hidden { display: none !important; }
+          #certificate-for-print, #certificate-for-print * { visibility: visible; }
+          #certificate-for-print {
+            position: absolute; top: 0; left: 0; width: 100%;
+            padding: 40px; box-shadow: none; border-radius: 0;
+          }
         }
       `}</style>
     </div>

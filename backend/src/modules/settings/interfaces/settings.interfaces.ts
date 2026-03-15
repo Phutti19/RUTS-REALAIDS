@@ -50,7 +50,7 @@ export interface AdminUser {
 
 // ── Data Backup ───────────────────────────────────────────────────────────────
 
-export type BackupStatus = 'pending' | 'completed' | 'failed';
+export type BackupStatus = 'in_progress' | 'completed' | 'failed';
 export type BackupType = 'manual' | 'scheduled';
 
 export interface DataBackupRow {

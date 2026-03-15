@@ -37,6 +37,22 @@ html {
   scroll-behavior: smooth;
 }
 
+/* ── Form input utility used in patients page ──────────────────────────────── */
+.fi {
+  width: 100%;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid rgb(229 231 235);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: rgb(31 41 55);
+  background-color: #fff;
+  outline: none;
+}
+.fi:focus { box-shadow: 0 0 0 2px rgb(96 165 250 / 0.5); border-color: rgb(96 165 250); }
+.fi:disabled { background-color: rgb(249 250 251); color: rgb(107 114 128); cursor: default; }
+.dark .portal-page .fi { background-color: rgb(30 41 59); color: rgb(241 245 249); border-color: rgb(51 65 85); }
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -138,6 +154,13 @@ html {
  * defined directly on elements are never overridden.
  * ─────────────────────────────────────────────────────────────────────────── */
 
+/* Default text color for portal-page in dark mode.
+   Elements without an explicit text-* class inherit from body (#f1f5f9 = white).
+   Setting a sensible default here ensures they stay readable on dark backgrounds
+   and are not accidentally white-on-white on any remaining light containers.
+   More specific rules below will override for elements that have explicit classes. */
+.dark .portal-page { color: rgb(203 213 225); } /* slate-300 */
+
 /* Backgrounds */
 .dark .portal-page .bg-white:not([class*="dark:bg"])    { background-color: rgb(30  41  59); } /* slate-800 */
 .dark .portal-page .bg-gray-50:not([class*="dark:bg"])  { background-color: rgb(15  23  42); } /* slate-900 */
@@ -177,3 +200,22 @@ html {
 }
 .dark .portal-page input::placeholder,
 .dark .portal-page textarea::placeholder { color: rgb(100 116 139); }
+
+/* ── Auth-layout: always light-mode regardless of theme setting ──────────── */
+/* Tailwind preflight sets `input { color: inherit }` — in dark mode body's
+   color becomes #f1f5f9 (white) which propagates into inputs/labels on
+   auth pages (no .portal-page class), making white text on white bg invisible.
+   We neutralise this here. */
+.dark .auth-layout {
+  color-scheme: light;
+  color: rgb(17 24 39); /* gray-900: overrides body's dark-mode #f1f5f9 */
+}
+.dark .auth-layout input,
+.dark .auth-layout textarea,
+.dark .auth-layout select {
+  background-color: #ffffff;
+  color: rgb(55 65 81); /* gray-700 */
+  border-color: rgb(209 213 219); /* gray-300 */
+}
+.dark .auth-layout input::placeholder,
+.dark .auth-layout textarea::placeholder { color: rgb(156 163 175); } /* gray-400 */

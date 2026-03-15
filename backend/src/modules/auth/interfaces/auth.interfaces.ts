@@ -24,6 +24,11 @@ export interface RefreshTokenRow {
   // Joined from users when needed
   role?: 'student' | 'staff' | 'admin';
   is_active?: boolean;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  student_id?: string | null;
+  phone?: string | null;
 }
 
 export interface PasswordResetTokenRow {
@@ -53,6 +58,7 @@ export interface AuthUser {
   firstName: string;
   lastName: string;
   studentId: string | null;
+  phone: string | null;
 }
 
 export interface TokenResponse {
@@ -63,6 +69,7 @@ export interface TokenResponse {
 
 export interface AccessTokenResponse {
   accessToken: string;
+  user: AuthUser;
 }
 
 // ── JWT payload ───────────────────────────────────────────────────────────────

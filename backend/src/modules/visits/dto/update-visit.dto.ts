@@ -4,6 +4,11 @@ import {
   IsOptional,
   MaxLength,
   IsObject,
+  IsBoolean,
+  IsArray,
+  IsNumber,
+  Min,
+  Max,
   ValidateNested,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
@@ -23,10 +28,35 @@ export class UpdateVisitDto {
   treatmentNotes?: string | null;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  @Transform(({ value }: { value: string }) => value?.trim() || null)
+  illnessHistory?: string | null;
+
+  @IsOptional()
   @IsObject()
   @ValidateNested()
   @Type(() => VitalSignsDto)
   vitalSigns?: VitalSignsDto;
+
+  @IsOptional()
+  @IsBoolean()
+  woundCare?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(72)
+  restHours?: number | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  consultationTypes?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  isReferred?: boolean;
 
   @IsOptional()
   @IsEnum(['waiting', 'in_treatment', 'completed', 'referred'], {

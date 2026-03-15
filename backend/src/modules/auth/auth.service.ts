@@ -127,9 +127,17 @@ export class AuthService {
     const tokenHash = this.hashToken(rawRefreshToken);
 
     const tokenRow = await this.db.queryOne<
-      RefreshTokenRow & { role: 'student' | 'staff' | 'admin'; is_active: boolean }
+      RefreshTokenRow & {
+        role: 'student' | 'staff' | 'admin';
+        is_active: boolean;
+        email: string;
+        first_name: string;
+        last_name: string;
+        student_id: string | null;
+      }
     >(
-      `SELECT rt.user_id, u.role, u.is_active
+      `SELECT rt.user_id, u.role, u.is_active,
+              u.email, u.first_name, u.last_name, u.student_id, u.phone
        FROM refresh_tokens rt
        JOIN users u ON rt.user_id = u.id
        WHERE rt.token_hash = $1
@@ -147,7 +155,16 @@ export class AuthService {
     }
 
     const accessToken = this.signAccessToken(tokenRow.user_id, tokenRow.role);
-    return { accessToken };
+    const user: AuthUser = {
+      id: tokenRow.user_id,
+      email: tokenRow.email,
+      role: tokenRow.role,
+      firstName: tokenRow.first_name,
+      lastName: tokenRow.last_name,
+      studentId: tokenRow.student_id,
+      phone: tokenRow.phone ?? null,
+    };
+    return { accessToken, user };
   }
 
   async logout(rawRefreshToken: string): Promise<void> {
@@ -269,6 +286,7 @@ export class AuthService {
       firstName: user.first_name,
       lastName: user.last_name,
       studentId: user.student_id,
+      phone: user.phone ?? null,
     };
 
     return { accessToken, refreshToken: rawRefreshToken, user: authUser };

@@ -41,7 +41,7 @@ export class BackupsController {
   async downloadBackup(@Param('id') id: string, @Res() res: Response) {
     const { filename, buffer } = await this.settingsService.downloadBackup(id);
     res.set({
-      'Content-Type': 'application/octet-stream',
+      'Content-Type': 'application/json',
       'Content-Disposition': `attachment; filename="${filename}"`,
       'Content-Length': String(buffer.length),
     });
