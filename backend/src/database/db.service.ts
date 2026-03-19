@@ -6,7 +6,12 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow, types } from 'pg';
+
+// pg parses `date` columns as JavaScript Date objects (midnight in server TZ),
+// which shifts the date by -1 day when converted to UTC via toISOString().
+// Override OID 1082 (date) to return the raw "YYYY-MM-DD" string instead.
+types.setTypeParser(1082, (val: string) => val);
 
 export interface PaginationOptions {
   page?: number;

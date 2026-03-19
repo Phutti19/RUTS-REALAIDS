@@ -635,10 +635,10 @@ export class VisitsService {
     const id = randomUUID();
 
     await this.db.query(
-      `INSERT INTO users (id, student_id, email, password_hash, first_name, last_name, phone, role, title, department, year_of_study, birth_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'student', $8, $9, $10, $11)`,
+      `INSERT INTO users (id, student_id, email, password_hash, first_name, last_name, phone, role, title, faculty, department, year_of_study, birth_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'student', $8, $9, $10, $11, $12)`,
       [id, dto.studentId, email, passwordHash, dto.firstName, dto.lastName, dto.phone ?? null,
-       dto.title, dto.department ?? null, dto.yearOfStudy ?? null, dto.birthDate ?? null],
+       dto.title, dto.faculty ?? null, dto.department ?? null, dto.yearOfStudy ?? null, dto.birthDate ?? null],
     );
 
     // Create empty health profile so joins don't fail

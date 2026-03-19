@@ -14,6 +14,8 @@ import {
   Phone,
   Mail,
   IdCard,
+  GraduationCap,
+  BookOpen,
   Droplets,
   ShieldAlert,
   Stethoscope,
@@ -170,22 +172,7 @@ export default function StudentProfilePage() {
         >
           {editPersonal ? (
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="ชื่อ">
-                  <input
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
-                  />
-                </Field>
-                <Field label="นามสกุล">
-                  <input
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
-                  />
-                </Field>
-              </div>
+              <InfoRow icon={<IdCard size={14} className="text-gray-400" />} label="ชื่อ-นามสกุล" value={fullName} />
               <Field label="เบอร์โทรศัพท์">
                 <input
                   type="tel"
@@ -204,6 +191,12 @@ export default function StudentProfilePage() {
               <InfoRow icon={<IdCard size={14} className="text-gray-400" />} label="รหัสนักศึกษา" value={user?.studentId ?? "—"} />
               <InfoRow icon={<Mail size={14} className="text-gray-400" />} label="อีเมล" value={user?.email ?? "—"} />
               <InfoRow icon={<Phone size={14} className="text-gray-400" />} label="เบอร์โทร" value={phone || "ยังไม่ระบุ"} />
+              {user?.role === "student" && (
+                <>
+                  <InfoRow icon={<GraduationCap size={14} className="text-gray-400" />} label="คณะ" value={user?.faculty ?? "ยังไม่ระบุ"} />
+                  <InfoRow icon={<BookOpen size={14} className="text-gray-400" />} label="สาขา" value={user?.department ?? "ยังไม่ระบุ"} />
+                </>
+              )}
             </div>
           )}
         </SectionCard>

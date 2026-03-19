@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   HttpCode,
   HttpStatus,
@@ -8,6 +9,7 @@ import {
   Res,
   UseGuards,
   UnauthorizedException,
+  Query,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
@@ -15,6 +17,7 @@ import { AuthService } from './auth.service';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ActivateAccountDto } from './dto/activate-account.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
@@ -61,6 +64,31 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() dto: RegisterDto) {
     const data = await this.authService.register(dto);
+    return { success: true, data };
+  }
+
+  /**
+   * GET /api/v1/auth/lookup?studentId=xxx
+   * Look up an unactivated student account. Returns name + masked email.
+   * Used by the frontend to confirm identity before setting a password.
+   */
+  @Get('lookup')
+  async lookupUnactivated(@Query('studentId') studentId: string) {
+    if (!studentId) {
+      return { success: false, error: 'MISSING_PARAM', message: 'studentId is required' };
+    }
+    const data = await this.authService.lookupUnactivated(studentId);
+    return { success: true, data };
+  }
+
+  /**
+   * POST /api/v1/auth/activate
+   * Activate a pre-imported student account by setting a password.
+   */
+  @Post('activate')
+  @HttpCode(HttpStatus.OK)
+  async activateAccount(@Body() dto: ActivateAccountDto) {
+    const data = await this.authService.activateAccount(dto);
     return { success: true, data };
   }
 

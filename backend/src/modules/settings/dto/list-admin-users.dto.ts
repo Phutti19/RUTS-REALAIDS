@@ -1,5 +1,5 @@
 import { IsOptional, IsIn, IsString, IsInt, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class ListAdminUsersDto {
   @IsOptional()
@@ -12,7 +12,7 @@ export class ListAdminUsersDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(500)
   limit?: number = 20;
 
   @IsOptional()
@@ -21,5 +21,19 @@ export class ListAdminUsersDto {
 
   @IsOptional()
   @IsString()
+  @Transform(({ value }: { value: string }) => value?.trim())
   search?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: string }) => value?.trim())
+  faculty?: string;
+
+  @IsOptional()
+  @IsIn(['created_at', 'first_name', 'last_name', 'email', 'role'])
+  sortBy?: string = 'created_at';
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  order?: 'asc' | 'desc' = 'desc';
 }

@@ -67,8 +67,8 @@ async function request<T>(
     credentials: "include",
   });
 
-  // If 401, try refreshing once (even if we had no token — page may have just loaded)
-  if (res.status === 401) {
+  // If 401, try refreshing once — but skip if this IS the refresh endpoint (avoids loop)
+  if (res.status === 401 && !path.includes("/auth/refresh")) {
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers["Authorization"] = `Bearer ${newToken}`;

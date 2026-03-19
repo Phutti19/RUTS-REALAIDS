@@ -220,15 +220,17 @@ function LoginPageInner() {
                 className={`space-y-4 ${error ? "shake-anim" : ""}`}
               >
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">อีเมล</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {isStaff ? "อีเมล" : "รหัสนักศึกษา หรือ อีเมล"}
+                  </label>
                   <input
-                    type="email"
+                    type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="example@rmutsv.ac.th"
+                    placeholder={isStaff ? "example@rmutsv.ac.th" : "รหัสนักศึกษา 12 หลัก หรือ อีเมล"}
                     required
                     autoFocus
-                    autoComplete="email"
+                    autoComplete="username"
                     className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-shadow duration-200 hover:border-gray-400"
                   />
                 </div>
@@ -240,7 +242,7 @@ function LoginPageInner() {
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="รหัสผ่าน"
+                      placeholder={isStaff ? "รหัสผ่าน" : "รหัสผ่าน (เริ่มต้น = รหัสนักศึกษา)"}
                       required
                       autoComplete="current-password"
                       className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-shadow duration-200 hover:border-gray-400"
@@ -292,7 +294,7 @@ function LoginPageInner() {
                       href="/register"
                       className="text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                     >
-                      สมัครสมาชิก
+                      เปลี่ยนรหัสผ่าน
                     </a>
                   </>
                 )}

@@ -348,6 +348,14 @@ export class AppointmentsService {
       conditions.push(`a.appointment_date = $${idx++}`);
       values.push(dto.date);
     }
+    if (dto.from) {
+      conditions.push(`a.appointment_date >= $${idx++}`);
+      values.push(dto.from);
+    }
+    if (dto.to) {
+      conditions.push(`a.appointment_date <= $${idx++}`);
+      values.push(dto.to);
+    }
     if (dto.status) {
       conditions.push(`a.status = $${idx++}::appointment_status`);
       values.push(dto.status);
@@ -422,7 +430,7 @@ export class AppointmentsService {
        JOIN users p  ON p.id  = a.patient_id
        JOIN users st ON st.id = a.staff_id
        JOIN appointment_slots sl ON sl.id = a.slot_id
-       WHERE a.appointment_date = CURRENT_DATE
+       WHERE a.appointment_date = (NOW() AT TIME ZONE 'Asia/Bangkok')::date
        ORDER BY a.appointment_time ASC, a.status ASC`,
     );
     return rows.map((r) => this.formatAppointment(r));
@@ -483,6 +491,21 @@ export class AppointmentsService {
 
   async noShow(id: string): Promise<Appointment> {
     return this.transitionStatus(id, 'no_show', ['scheduled', 'checked_in']);
+  }
+
+  /**
+   * Auto-mark past scheduled appointments as no_show.
+   * Called by the cron job daily at midnight.
+   * Returns the number of rows updated.
+   */
+  async autoNoShowPastAppointments(): Promise<number> {
+    const rowCount = await this.db.execute(
+      `UPDATE appointments
+       SET status = 'no_show'::appointment_status, updated_at = NOW()
+       WHERE status = 'scheduled'
+         AND appointment_date < (NOW() AT TIME ZONE 'Asia/Bangkok')::date`,
+    );
+    return rowCount;
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────────

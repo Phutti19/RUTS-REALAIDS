@@ -17,20 +17,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { cn, statusLabel } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { Appointment, AppointmentStatus } from "@/types";
 
-function getWeekDates(refDate: Date): Date[] {
-  const day = refDate.getDay();
-  const monday = new Date(refDate);
-  monday.setDate(refDate.getDate() - (day === 0 ? 6 : day - 1));
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return d;
-  });
-}
-
+/* ─── helpers ─────────────────────────────────────────────── */
 function getInitials(name: string): string {
   const parts = name.trim().split(" ");
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -48,10 +38,7 @@ function avatarColor(id: string): string {
 }
 
 const STATUS_CONFIG: Record<AppointmentStatus, {
-  label: string;
-  dot: string;
-  badge: string;
-  border: string;
+  label: string; dot: string; badge: string; border: string;
 }> = {
   scheduled:  { label: "นัดหมายแล้ว", dot: "bg-blue-500",   badge: "bg-blue-100 text-blue-700",     border: "border-blue-400" },
   checked_in: { label: "เช็คอินแล้ว",  dot: "bg-green-500",  badge: "bg-green-100 text-green-700",   border: "border-green-400" },
@@ -62,59 +49,88 @@ const STATUS_CONFIG: Record<AppointmentStatus, {
 
 type FilterTab = "all" | AppointmentStatus;
 
+function toLocalDateStr(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+/* calendar grid: returns cells (null = padding, Date = real day) */
+function getMonthGrid(year: number, month: number): (Date | null)[] {
+  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startOffset = firstDay === 0 ? 6 : firstDay - 1; // Monday-first
+  const cells: (Date | null)[] = Array(startOffset).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+/* ─── component ───────────────────────────────────────────── */
 export default function StaffAppointmentsPage() {
-  const today = new Date().toISOString().split("T")[0];
-  const [weekRef, setWeekRef] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(today);
+  const todayStr = toLocalDateStr(new Date());
+  const todayDate = new Date();
+
+  const [viewYear, setViewYear] = useState(todayDate.getFullYear());
+  const [viewMonth, setViewMonth] = useState(todayDate.getMonth());
+  const [selectedDate, setSelectedDate] = useState(todayStr);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [monthCounts, setMonthCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterTab>("all");
 
-  const weekDates = getWeekDates(weekRef);
-
+  /* fetch selected-day appointments */
   useEffect(() => {
     setLoading(true);
     api
       .get<Appointment[]>(`/appointments?date=${selectedDate}&limit=100`)
       .then((res) => {
-        if (res.success) {
-          setAppointments(Array.isArray(res.data) ? (res.data as unknown as Appointment[]) : []);
-        }
+        setAppointments(Array.isArray(res.data) ? (res.data as unknown as Appointment[]) : []);
         setLoading(false);
       });
   }, [selectedDate]);
 
+  /* fetch whole-month counts (light) */
+  useEffect(() => {
+    const from = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-01`;
+    const lastDay = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const to = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${lastDay}`;
+    api
+      .get<Appointment[]>(`/appointments?from=${from}&to=${to}&limit=500`)
+      .then((res) => {
+        const counts: Record<string, number> = {};
+        if (Array.isArray(res.data)) {
+          (res.data as unknown as Appointment[]).forEach((a) => {
+            const d = a.appointmentDate;
+            counts[d] = (counts[d] ?? 0) + 1;
+          });
+        }
+        setMonthCounts(counts);
+      });
+  }, [viewYear, viewMonth]);
+
+  /* actions */
   const checkIn = async (id: string) => {
     setActionLoading(id);
     await api.patch(`/appointments/${id}/check-in`);
-    setAppointments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "checked_in" } : a))
-    );
+    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "checked_in" } : a)));
     setActionLoading(null);
   };
-
   const cancel = async (id: string) => {
     if (!confirm("ยืนยันยกเลิกนัด?")) return;
     setActionLoading(id);
     await api.patch(`/appointments/${id}/cancel`, { cancelReason: "ยกเลิกโดยเจ้าหน้าที่" });
-    setAppointments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a))
-    );
+    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a)));
     setActionLoading(null);
   };
-
   const markNoShow = async (id: string) => {
     if (!confirm("ยืนยันว่าผู้ป่วยไม่มา?")) return;
     setActionLoading(id);
     await api.patch(`/appointments/${id}/no-show`);
-    setAppointments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "no_show" } : a))
-    );
+    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "no_show" } : a)));
     setActionLoading(null);
   };
 
-  // Stats
+  /* derived */
   const stats = useMemo(() => ({
     total: appointments.length,
     scheduled: appointments.filter((a) => a.status === "scheduled").length,
@@ -123,19 +139,12 @@ export default function StaffAppointmentsPage() {
     cancelled: appointments.filter((a) => a.status === "cancelled" || a.status === "no_show").length,
   }), [appointments]);
 
-  // Filtered list
   const filtered = useMemo(() =>
     appointments
       .filter((a) => filter === "all" || a.status === filter)
       .sort((a, b) => a.appointmentTime.localeCompare(b.appointmentTime)),
     [appointments, filter]
   );
-
-  const DAY_SHORT = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
-
-  const selectedDateLabel = new Date(selectedDate + "T00:00:00").toLocaleDateString("th-TH", {
-    weekday: "long", day: "numeric", month: "long",
-  });
 
   const FILTER_TABS: { key: FilterTab; label: string; count: number }[] = [
     { key: "all",        label: "ทั้งหมด",      count: stats.total },
@@ -144,6 +153,32 @@ export default function StaffAppointmentsPage() {
     { key: "completed",  label: "เสร็จสิ้น",    count: stats.completed },
     { key: "cancelled",  label: "ยกเลิก/ไม่มา", count: stats.cancelled },
   ];
+
+  const DAY_HEADERS = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"];
+  const monthGrid = getMonthGrid(viewYear, viewMonth);
+
+  const selectedDateLabel = new Date(selectedDate + "T00:00:00").toLocaleDateString("th-TH", {
+    weekday: "long", day: "numeric", month: "long",
+  });
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
+    else setViewMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); }
+    else setViewMonth(m => m + 1);
+  };
+  const goToday = () => {
+    const now = new Date();
+    setViewYear(now.getFullYear());
+    setViewMonth(now.getMonth());
+    setSelectedDate(todayStr);
+  };
+
+  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString("th-TH", {
+    month: "long", year: "numeric",
+  });
 
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
@@ -161,71 +196,78 @@ export default function StaffAppointmentsPage() {
         </Link>
       </div>
 
-      {/* Week calendar */}
+      {/* Monthly Calendar */}
       <div className="bg-white rounded-2xl shadow-sm p-4">
+        {/* Month nav */}
         <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => {
-              const d = new Date(weekRef);
-              d.setDate(d.getDate() - 7);
-              setWeekRef(d);
-            }}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-          >
+          <button onClick={prevMonth} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
             <ChevronLeft size={18} className="text-gray-500" />
           </button>
 
           <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-gray-700">
-              {weekDates[0].toLocaleDateString("th-TH", { month: "long", year: "numeric" })}
-            </span>
-            {selectedDate !== today && (
+            <span className="text-sm font-bold text-gray-800">{monthLabel}</span>
+            {(viewYear !== todayDate.getFullYear() || viewMonth !== todayDate.getMonth()) && (
               <button
-                onClick={() => {
-                  setSelectedDate(today);
-                  setWeekRef(new Date());
-                }}
+                onClick={goToday}
                 className="text-xs text-blue-600 hover:text-blue-700 font-medium px-2.5 py-1 bg-blue-50 rounded-full transition-colors"
               >
-                วันนี้
+                เดือนนี้
               </button>
             )}
           </div>
 
-          <button
-            onClick={() => {
-              const d = new Date(weekRef);
-              d.setDate(d.getDate() + 7);
-              setWeekRef(d);
-            }}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-          >
+          <button onClick={nextMonth} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
             <ChevronRight size={18} className="text-gray-500" />
           </button>
         </div>
 
-        <div className="grid grid-cols-7 gap-1.5">
-          {weekDates.map((date) => {
-            const dateStr = date.toISOString().split("T")[0];
+        {/* Day-of-week headers */}
+        <div className="grid grid-cols-7 mb-1">
+          {DAY_HEADERS.map((d) => (
+            <div key={d} className="text-center text-[11px] font-semibold text-gray-400 py-1">
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar cells */}
+        <div className="grid grid-cols-7 gap-1">
+          {monthGrid.map((date, i) => {
+            if (!date) return <div key={`pad-${i}`} />;
+
+            const dateStr = toLocalDateStr(date);
             const isSelected = dateStr === selectedDate;
-            const isToday = dateStr === today;
+            const isToday = dateStr === todayStr;
+            const count = monthCounts[dateStr] ?? 0;
+            const isPast = date < new Date(todayStr + "T00:00:00");
+            const isSunday = date.getDay() === 0;
+
             return (
               <button
                 key={dateStr}
                 onClick={() => setSelectedDate(dateStr)}
                 className={cn(
-                  "flex flex-col items-center py-2.5 rounded-xl transition-all",
+                  "relative flex flex-col items-center justify-center rounded-xl py-2.5 transition-all text-sm font-bold",
                   isSelected
                     ? "bg-blue-600 text-white shadow-md shadow-blue-200"
                     : isToday
-                    ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
-                    : "hover:bg-gray-50 text-gray-500"
+                    ? "bg-blue-50 text-blue-700 ring-1.5 ring-blue-300"
+                    : isPast
+                    ? isSunday ? "text-red-300 hover:bg-gray-50" : "text-gray-400 hover:bg-gray-50"
+                    : isSunday ? "text-red-500 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"
                 )}
               >
-                <span className={cn("text-[11px] font-medium mb-0.5", isSelected ? "opacity-80" : "")}>
-                  {DAY_SHORT[date.getDay()]}
-                </span>
-                <span className="text-sm font-bold leading-none">{date.getDate()}</span>
+                <span className="leading-none">{date.getDate()}</span>
+                {count > 0 && (
+                  <span className={cn(
+                    "mt-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full leading-none",
+                    isSelected
+                      ? "bg-white/25 text-white"
+                      : "bg-blue-100 text-blue-600"
+                  )}>
+                    {count}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -282,7 +324,7 @@ export default function StaffAppointmentsPage() {
         )}
       </div>
 
-      {/* Content */}
+      {/* Appointment list */}
       {loading ? (
         <div className="py-12 flex justify-center">
           <Loader2 size={24} className="animate-spin text-gray-300" />
@@ -302,17 +344,13 @@ export default function StaffAppointmentsPage() {
         </div>
       ) : (
         <div className="relative">
-          {/* Timeline line */}
           <div className="absolute left-[27px] top-4 bottom-4 w-px bg-gray-100 z-0" />
-
           <div className="space-y-3">
             {filtered.map((apt) => {
               const cfg = STATUS_CONFIG[apt.status] ?? STATUS_CONFIG.scheduled;
               const isLoading = actionLoading === apt.id;
-
               return (
                 <div key={apt.id} className="relative flex gap-3 items-start">
-                  {/* Time + dot */}
                   <div className="flex flex-col items-center flex-shrink-0 w-14 z-10 pt-3.5">
                     <div className={cn("w-2.5 h-2.5 rounded-full ring-2 ring-white mb-1", cfg.dot)} />
                     <span className="text-xs font-bold text-gray-700 tabular-nums leading-none">
@@ -320,14 +358,12 @@ export default function StaffAppointmentsPage() {
                     </span>
                   </div>
 
-                  {/* Card */}
                   <div className={cn(
                     "flex-1 bg-white rounded-2xl shadow-sm p-4 border-l-4 transition-all",
                     cfg.border,
                     apt.status === "cancelled" || apt.status === "no_show" ? "opacity-60" : ""
                   )}>
                     <div className="flex items-start gap-3">
-                      {/* Avatar */}
                       <div className={cn(
                         "w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-white text-xs font-bold",
                         avatarColor(apt.patientId)
@@ -335,16 +371,11 @@ export default function StaffAppointmentsPage() {
                         {getInitials(apt.patientName)}
                       </div>
 
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="text-sm font-semibold text-gray-900 truncate">
-                              {apt.patientName}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-0.5 truncate">
-                              {apt.reason}
-                            </p>
+                            <p className="text-sm font-semibold text-gray-900 truncate">{apt.patientName}</p>
+                            <p className="text-xs text-gray-500 mt-0.5 truncate">{apt.reason}</p>
                           </div>
                           <span className={cn("flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium", cfg.badge)}>
                             {cfg.label}
@@ -352,16 +383,11 @@ export default function StaffAppointmentsPage() {
                         </div>
 
                         {apt.notes && (
-                          <p className="text-xs text-gray-400 mt-1 truncate">
-                            หมายเหตุ: {apt.notes}
-                          </p>
+                          <p className="text-xs text-gray-400 mt-1 truncate">หมายเหตุ: {apt.notes}</p>
                         )}
                         {apt.cancelReason && apt.status === "cancelled" && (
-                          <p className="text-xs text-red-400 mt-1">
-                            เหตุผล: {apt.cancelReason}
-                          </p>
+                          <p className="text-xs text-red-400 mt-1">เหตุผล: {apt.cancelReason}</p>
                         )}
-
                         <div className="flex items-center gap-1 mt-0.5">
                           <User size={11} className="text-gray-300" />
                           <span className="text-xs text-gray-400">{apt.staffName}</span>
@@ -369,7 +395,6 @@ export default function StaffAppointmentsPage() {
                       </div>
                     </div>
 
-                    {/* Actions */}
                     {(apt.status === "scheduled" || apt.status === "checked_in") && (
                       <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
                         {apt.status === "scheduled" && (

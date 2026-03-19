@@ -14,13 +14,16 @@ import {
   TrendingDown,
   ChevronDown,
   ChevronUp,
+  Trash2,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import type { Medicine, MedicineBatch, MedicineStockLog } from "@/types";
 
 export default function MedicineDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const [medicine, setMedicine] = useState<Medicine | null>(null);
   const [batches, setBatches] = useState<MedicineBatch[]>([]);
   const [logs, setLogs] = useState<MedicineStockLog[]>([]);
@@ -34,6 +37,23 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
   const [batchNote, setBatchNote] = useState("");
   const [addingBatch, setAddingBatch] = useState(false);
   const [batchMsg, setBatchMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  // Delete
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setDeleteError("");
+    const res = await api.delete(`/medicines/${id}`);
+    setDeleting(false);
+    if (res.success) {
+      router.push("/staff/medicines");
+    } else {
+      setDeleteError(res.message ?? "ไม่สามารถลบได้");
+    }
+  };
 
   // Adjust stock form
   const [showAdjustForm, setShowAdjustForm] = useState(false);
@@ -156,13 +176,61 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
             <AlertTriangle size={13} /> สต๊อกต่ำ
           </span>
         )}
+        <button
+          onClick={() => { setShowDeleteConfirm(true); setDeleteError(""); }}
+          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+          title="ลบรายการนี้"
+        >
+          <Trash2 size={18} />
+        </button>
       </div>
+
+      {/* Delete confirm dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Trash2 size={20} className="text-red-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900">ลบ "{medicine.name}"?</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  หากยานี้เคยถูกใช้ในบันทึกผู้ป่วยจะไม่สามารถลบได้
+                </p>
+              </div>
+            </div>
+            {deleteError && (
+              <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 rounded-xl px-3 py-2.5">
+                <AlertCircle size={15} className="flex-shrink-0" />
+                {deleteError}
+              </div>
+            )}
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => { setShowDeleteConfirm(false); setDeleteError(""); }}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors"
+              >
+                {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                ลบ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Stock overview */}
         <div className="space-y-4">
           {(() => {
-            const batchTotal = batches.filter((b) => !b.isExpired).reduce((s, b) => s + b.quantity, 0);
+            const batchTotal = batches.filter((b) => new Date(b.expiryDate) > new Date()).reduce((s, b) => s + b.quantity, 0);
             const mismatch = batches.length > 0 && batchTotal !== medicine.stockQuantity;
             return (
               <>

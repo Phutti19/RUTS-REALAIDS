@@ -44,14 +44,14 @@ export default function StudentLayout({
 
   return (
     <div className="portal-page min-h-screen bg-gray-200 dark:bg-gray-950 pb-20">
-      {/* On tablet+: the content column appears as a centered "phone app" card */}
-      <main className="page-enter max-w-md mx-auto bg-gray-50 dark:bg-gray-900 min-h-screen sm:shadow-2xl sm:shadow-black/10">
+      {/* On tablet+: the content column appears as a centered card */}
+      <main className="page-enter max-w-md sm:max-w-xl md:max-w-2xl mx-auto bg-gray-50 dark:bg-gray-900 min-h-screen sm:shadow-2xl sm:shadow-black/10">
         {children}
       </main>
 
       {/* Bottom Navigation */}
       <nav className="nav-slide-up fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 z-50">
-        <div className="max-w-md mx-auto flex items-center">
+        <div className="max-w-md sm:max-w-xl md:max-w-2xl mx-auto flex items-center">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const isActive = pathname.startsWith(href);
             return (

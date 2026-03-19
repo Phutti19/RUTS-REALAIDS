@@ -76,4 +76,15 @@ export class AdminUsersController {
     const data = await this.settingsService.activateUser(id);
     return { success: true, data };
   }
+
+  /**
+   * PATCH /api/v1/admin/users/:id/reset-password
+   * Reset a student's password back to their student_id.
+   */
+  @Patch(':id/reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetStudentPassword(@Param('id') id: string) {
+    await this.settingsService.resetStudentPassword(id);
+    return { success: true, message: 'Password reset to student ID successfully' };
+  }
 }

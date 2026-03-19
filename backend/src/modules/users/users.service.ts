@@ -27,7 +27,7 @@ export class UsersService {
   async getMe(userId: string): Promise<UserProfile> {
     const user = await this.db.queryOne<UserRow>(
       `SELECT id, student_id, email, first_name, last_name, phone, role, is_active, created_at,
-              national_id, title, birth_date, department, year_of_study, "position"
+              national_id, title, birth_date, faculty, department, year_of_study, "position"
        FROM users
        WHERE id = $1`,
       [userId],
@@ -68,7 +68,7 @@ export class UsersService {
        SET ${fields.join(', ')}
        WHERE id = $${idx}
        RETURNING id, student_id, email, first_name, last_name, phone, role, is_active, created_at,
-                 national_id, title, birth_date, department, year_of_study, "position"`,
+                 national_id, title, birth_date, faculty, department, year_of_study, "position"`,
       values,
     );
 
@@ -183,7 +183,7 @@ export class UsersService {
     const countSql = `SELECT COUNT(*) FROM users ${where}`;
     const dataSql = `
       SELECT id, student_id, email, first_name, last_name, phone, role, is_active, created_at,
-              national_id, title, birth_date, department, year_of_study, "position"
+              national_id, title, birth_date, faculty, department, year_of_study, "position"
       FROM users
       ${where}
       ORDER BY ${sortCol} ${sortDir}
@@ -205,7 +205,7 @@ export class UsersService {
   async getUserById(id: string): Promise<UserProfile> {
     const user = await this.db.queryOne<UserRow>(
       `SELECT id, student_id, email, first_name, last_name, phone, role, is_active, created_at,
-              national_id, title, birth_date, department, year_of_study, "position"
+              national_id, title, birth_date, faculty, department, year_of_study, "position"
        FROM users
        WHERE id = $1`,
       [id],
@@ -232,6 +232,7 @@ export class UsersService {
       nationalId: row.national_id ?? null,
       title: row.title ?? null,
       birthDate: row.birth_date ?? null,
+      faculty: row.faculty ?? null,
       department: row.department ?? null,
       yearOfStudy: row.year_of_study ?? null,
       position: row.position ?? null,
@@ -263,7 +264,7 @@ export class UsersService {
        SET ${fields.join(', ')}
        WHERE id = $${idx}
        RETURNING id, student_id, email, first_name, last_name, phone, role, is_active, created_at,
-                 national_id, title, birth_date, department, year_of_study, "position"`,
+                 national_id, title, birth_date, faculty, department, year_of_study, "position"`,
       values,
     );
 

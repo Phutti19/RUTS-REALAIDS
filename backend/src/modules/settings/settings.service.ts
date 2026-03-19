@@ -66,6 +66,9 @@ function formatAdminUser(row: AdminUserRow): AdminUser {
     role: row.role,
     isActive: row.is_active,
     createdAt: row.created_at,
+    studentId: row.student_id ?? null,
+    faculty: row.faculty ?? null,
+    department: row.department ?? null,
   };
 }
 
@@ -159,9 +162,13 @@ export class SettingsService {
       conditions.push(`role = $${idx++}::user_role`);
       values.push(dto.role);
     }
+    if (dto.faculty) {
+      conditions.push(`faculty = $${idx++}`);
+      values.push(dto.faculty);
+    }
     if (dto.search) {
       conditions.push(
-        `(first_name ILIKE $${idx} OR last_name ILIKE $${idx} OR email ILIKE $${idx})`,
+        `(first_name ILIKE $${idx} OR last_name ILIKE $${idx} OR email ILIKE $${idx} OR COALESCE(student_id,'') ILIKE $${idx})`,
       );
       values.push(`%${dto.search}%`);
       idx++;
@@ -169,11 +176,19 @@ export class SettingsService {
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
+    const allowedSort: Record<string, string> = {
+      created_at: 'created_at', first_name: 'first_name',
+      last_name: 'last_name', email: 'email', role: 'role',
+    };
+    const sortCol = allowedSort[dto.sortBy ?? 'created_at'] ?? 'created_at';
+    const sortDir = dto.order === 'asc' ? 'ASC' : 'DESC';
+
     const result = await this.db.queryPaginated<AdminUserRow>(
       `SELECT COUNT(*) FROM users ${where}`,
-      `SELECT id, email, first_name, last_name, phone, role, is_active, created_at
+      `SELECT id, student_id, email, first_name, last_name, phone, role, is_active, created_at,
+              faculty, department
        FROM users ${where}
-       ORDER BY created_at DESC`,
+       ORDER BY ${sortCol} ${sortDir}`,
       values,
       { page: dto.page, limit: dto.limit },
     );
@@ -193,7 +208,7 @@ export class SettingsService {
     const row = await this.db.queryOne<AdminUserRow>(
       `INSERT INTO users (id, email, password_hash, first_name, last_name, phone, role)
        VALUES ($1, $2, $3, $4, $5, $6, $7::user_role)
-       RETURNING id, email, first_name, last_name, phone, role, is_active, created_at`,
+       RETURNING id, student_id, email, first_name, last_name, phone, role, is_active, created_at, faculty, department`,
       [
         randomUUID(),
         dto.email,
@@ -249,7 +264,7 @@ export class SettingsService {
       `UPDATE users
        SET ${fields.join(', ')}
        WHERE id = $${idx}
-       RETURNING id, email, first_name, last_name, phone, role, is_active, created_at`,
+       RETURNING id, student_id, email, first_name, last_name, phone, role, is_active, created_at, faculty, department`,
       values,
     );
     if (!row) throw new NotFoundException('User not found');
@@ -261,7 +276,7 @@ export class SettingsService {
       `UPDATE users
        SET is_active = false, updated_at = now()
        WHERE id = $1
-       RETURNING id, email, first_name, last_name, phone, role, is_active, created_at`,
+       RETURNING id, student_id, email, first_name, last_name, phone, role, is_active, created_at, faculty, department`,
       [id],
     );
     if (!row) throw new NotFoundException('User not found');
@@ -273,16 +288,36 @@ export class SettingsService {
       `UPDATE users
        SET is_active = true, updated_at = now()
        WHERE id = $1
-       RETURNING id, email, first_name, last_name, phone, role, is_active, created_at`,
+       RETURNING id, student_id, email, first_name, last_name, phone, role, is_active, created_at, faculty, department`,
       [id],
     );
     if (!row) throw new NotFoundException('User not found');
     return formatAdminUser(row);
   }
 
+  async resetStudentPassword(id: string): Promise<void> {
+    const user = await this.db.queryOne<{ student_id: string | null; role: string }>(
+      `SELECT student_id, role FROM users WHERE id = $1`,
+      [id],
+    );
+    if (!user) throw new NotFoundException('User not found');
+    if (user.role !== 'student') {
+      throw new BadRequestException('Password reset via student ID is only available for students');
+    }
+    if (!user.student_id) {
+      throw new BadRequestException('Student has no student ID to reset password to');
+    }
+
+    const passwordHash = await bcrypt.hash(user.student_id, BCRYPT_ROUNDS);
+    await this.db.execute(
+      `UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2`,
+      [passwordHash, id],
+    );
+  }
+
   private async getUserById(id: string): Promise<AdminUser> {
     const row = await this.db.queryOne<AdminUserRow>(
-      `SELECT id, email, first_name, last_name, phone, role, is_active, created_at
+      `SELECT id, student_id, email, first_name, last_name, phone, role, is_active, created_at, faculty, department
        FROM users WHERE id = $1`,
       [id],
     );

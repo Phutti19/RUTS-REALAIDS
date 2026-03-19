@@ -12,6 +12,8 @@ export interface UserRow {
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
+  faculty: string | null;
+  department: string | null;
 }
 
 export interface RefreshTokenRow {
@@ -29,6 +31,8 @@ export interface RefreshTokenRow {
   last_name?: string;
   student_id?: string | null;
   phone?: string | null;
+  faculty?: string | null;
+  department?: string | null;
 }
 
 export interface PasswordResetTokenRow {
@@ -59,6 +63,8 @@ export interface AuthUser {
   lastName: string;
   studentId: string | null;
   phone: string | null;
+  faculty: string | null;
+  department: string | null;
 }
 
 export interface TokenResponse {

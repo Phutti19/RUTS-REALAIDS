@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import {
   Settings, User, Bell, Users, Database, Save, Loader2,
   CheckCircle2, Shield, Phone, Plus, Trash2, AlertCircle,
-  UserCheck, UserX, X, Search,
+  UserCheck, UserX, X, Search, ChevronLeft, ChevronRight, KeyRound,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
@@ -399,7 +399,7 @@ function ContactsTab() {
 
 // ── Users Tab ──────────────────────────────────────────────────────────────────
 
-type AdminUserRow = { id: string; firstName: string; lastName: string; email: string; role: string; isActive: boolean; phone?: string | null };
+type AdminUserRow = { id: string; firstName: string; lastName: string; email: string; role: string; isActive: boolean; phone?: string | null; studentId?: string | null; faculty?: string | null; department?: string | null };
 
 type RoleFilter = "all" | "admin" | "staff" | "student";
 
@@ -409,17 +409,28 @@ const ROLE_GROUPS: { role: "admin" | "staff" | "student"; label: string; badge: 
   { role: "student", label: "นักศึกษา",     badge: "bg-gray-100 text-gray-600",   dot: "bg-gray-400"   },
 ];
 
+const PAGE_SIZE = 15;
+
 function UsersTab() {
-  const [users, setUsers] = useState<AdminUserRow[]>([]);
+  // ── Server-side pagination state ─────────────────────────────────────────────
+  const [data, setData] = useState<AdminUserRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [roleCounts, setRoleCounts] = useState({ all: 0, admin: 0, staff: 0, student: 0 });
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
+  const [facultyFilter, setFacultyFilter] = useState("");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // form state
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [resettingId, setResettingId] = useState<string | null>(null);
+  const [resetConfirm, setResetConfirm] = useState<AdminUserRow | null>(null);
   const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
-
-  // form state
   const [fEmail, setFEmail] = useState("");
   const [fFirstName, setFFirstName] = useState("");
   const [fLastName, setFLastName] = useState("");
@@ -427,16 +438,57 @@ function UsersTab() {
   const [fRole, setFRole] = useState<"staff" | "admin">("staff");
   const [fPassword, setFPassword] = useState("");
 
-  const load = () => {
+  // ── Debounce search ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset to page 1 when filter or search changes
+  useEffect(() => { setCurrentPage(1); }, [roleFilter, facultyFilter, debouncedSearch]);
+
+  // ── Fetch current page ─────────────────────────────────────────────────────
+  useEffect(() => {
     setLoading(true);
-    api.get<AdminUserRow[]>("/admin/users?limit=100").then((res) => {
-      if (res.success) setUsers(Array.isArray(res.data) ? (res.data as unknown as AdminUserRow[]) : []);
+    const params = new URLSearchParams({
+      page: String(currentPage),
+      limit: String(PAGE_SIZE),
+      sortBy: "role",
+      order: "asc",
+    });
+    if (roleFilter !== "all") params.set("role", roleFilter);
+    if (facultyFilter) params.set("faculty", facultyFilter);
+    if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+
+    api.get<AdminUserRow[]>(`/admin/users?${params}`).then((res) => {
+      if (res.success) {
+        setData(Array.isArray(res.data) ? (res.data as unknown as AdminUserRow[]) : []);
+        setTotal(res.total ?? 0);
+        setTotalPages(res.totalPages ?? 1);
+      }
       setLoading(false);
     });
+  }, [currentPage, roleFilter, facultyFilter, debouncedSearch]);
+
+  // ── Fetch role counts (once on mount, refresh after create/toggle) ─────────
+  const fetchCounts = () => {
+    Promise.all([
+      api.get<AdminUserRow[]>("/admin/users?limit=1"),
+      api.get<AdminUserRow[]>("/admin/users?limit=1&role=admin"),
+      api.get<AdminUserRow[]>("/admin/users?limit=1&role=staff"),
+      api.get<AdminUserRow[]>("/admin/users?limit=1&role=student"),
+    ]).then(([all, admin, staff, student]) => {
+      setRoleCounts({
+        all:     all.total     ?? 0,
+        admin:   admin.total   ?? 0,
+        staff:   staff.total   ?? 0,
+        student: student.total ?? 0,
+      });
+    });
   };
+  useEffect(() => { fetchCounts(); }, []);
 
-  useEffect(() => { load(); }, []);
-
+  // ── Helpers ────────────────────────────────────────────────────────────────
   const resetForm = () => {
     setFEmail(""); setFFirstName(""); setFLastName("");
     setFPhone(""); setFRole("staff"); setFPassword(""); setError("");
@@ -451,9 +503,9 @@ function UsersTab() {
       phone: fPhone.trim() || null, role: fRole, password: fPassword,
     });
     setSaving(false);
-    if (res.success && res.data) {
-      setUsers((prev) => [res.data!, ...prev]);
+    if (res.success) {
       resetForm(); setShowForm(false);
+      setCurrentPage(1); fetchCounts();
     } else {
       setError(res.message ?? "เกิดข้อผิดพลาด");
     }
@@ -464,29 +516,30 @@ function UsersTab() {
     const endpoint = u.isActive ? `/admin/users/${u.id}/deactivate` : `/admin/users/${u.id}/activate`;
     const res = await api.patch<AdminUserRow>(endpoint);
     if (res.success && res.data) {
-      setUsers((prev) => prev.map((x) => x.id === u.id ? { ...x, isActive: (res.data as AdminUserRow).isActive } : x));
+      setData((prev) => prev.map((x) => x.id === u.id ? { ...x, isActive: (res.data as AdminUserRow).isActive } : x));
+      fetchCounts();
     }
     setTogglingId(null);
   };
 
-  const q = search.toLowerCase();
-  const filtered = users.filter((u) => {
-    const matchRole = roleFilter === "all" || u.role === roleFilter;
-    const matchSearch = !q || `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q);
-    return matchRole && matchSearch;
-  });
+  const resetPassword = async (u: AdminUserRow) => {
+    setResettingId(u.id);
+    await api.patch(`/admin/users/${u.id}/reset-password`);
+    setResettingId(null);
+    setResetConfirm(null);
+  };
 
-  // group filtered users by role order
+  // Group current page data by role
   const groups = ROLE_GROUPS.map((g) => ({
     ...g,
-    items: filtered.filter((u) => u.role === g.role),
+    items: data.filter((u) => u.role === g.role),
   })).filter((g) => g.items.length > 0);
 
   const FILTER_TABS: { key: RoleFilter; label: string }[] = [
-    { key: "all",     label: `ทั้งหมด (${users.length})` },
-    { key: "admin",   label: `ผู้ดูแล (${users.filter((u) => u.role === "admin").length})` },
-    { key: "staff",   label: `เจ้าหน้าที่ (${users.filter((u) => u.role === "staff").length})` },
-    { key: "student", label: `นักศึกษา (${users.filter((u) => u.role === "student").length})` },
+    { key: "all",     label: `ทั้งหมด (${roleCounts.all})` },
+    { key: "admin",   label: `ผู้ดูแล (${roleCounts.admin})` },
+    { key: "staff",   label: `เจ้าหน้าที่ (${roleCounts.staff})` },
+    { key: "student", label: `นักศึกษา (${roleCounts.student})` },
   ];
 
   return (
@@ -544,15 +597,29 @@ function UsersTab() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="ค้นหาชื่อ หรืออีเมล..."
-          className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-        />
+      {/* Search + Faculty filter */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหาชื่อ อีเมล หรือรหัสนักศึกษา..."
+            className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+        <select
+          value={facultyFilter}
+          onChange={(e) => setFacultyFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-600 bg-white"
+        >
+          <option value="">ทุกคณะ</option>
+          <option value="คณะวิศวกรรมศาสตร์">คณะวิศวกรรมศาสตร์</option>
+          <option value="คณะครุศาสตร์อุตสาหกรรมและเทคโนโลยี">คณะครุศาสตร์อุตสาหกรรมและเทคโนโลยี</option>
+          <option value="คณะบริหารธุรกิจ">คณะบริหารธุรกิจ</option>
+          <option value="คณะสถาปัตยกรรมศาสตร์">คณะสถาปัตยกรรมศาสตร์</option>
+          <option value="คณะศิลปศาสตร์">คณะศิลปศาสตร์</option>
+        </select>
       </div>
 
       {/* Role filter tabs */}
@@ -575,7 +642,7 @@ function UsersTab() {
 
       {loading ? (
         <div className="py-8 flex justify-center"><Loader2 size={20} className="animate-spin text-gray-300" /></div>
-      ) : filtered.length === 0 ? (
+      ) : data.length === 0 ? (
         <div className="py-8 text-center text-gray-400">
           <Users size={28} className="mx-auto text-gray-200 mb-2" />
           <p className="text-sm">ไม่พบผู้ใช้งาน</p>
@@ -605,26 +672,129 @@ function UsersTab() {
                         {u.firstName} {u.lastName}
                       </p>
                       <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                      {u.role === "student" && (u.faculty || u.department) && (
+                        <p className="text-xs text-blue-500 truncate mt-0.5">
+                          {[u.faculty, u.department].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
                     </div>
                     {!u.isActive && (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600 flex-shrink-0">ปิดใช้งาน</span>
                     )}
-                    {u.role !== "student" && (
-                      <button onClick={() => toggleActive(u)} disabled={togglingId === u.id}
-                        className={cn("p-1.5 rounded-lg transition-colors flex-shrink-0",
-                          u.isActive
-                            ? "text-red-400 hover:text-red-600 hover:bg-red-50"
-                            : "text-green-500 hover:text-green-700 hover:bg-green-50"
-                        )}>
-                        {togglingId === u.id ? <Loader2 size={14} className="animate-spin" /> :
-                          u.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
+                    {/* Reset password — students only */}
+                    {u.role === "student" && (
+                      <button
+                        onClick={() => setResetConfirm(u)}
+                        disabled={resettingId === u.id}
+                        title="รีเซ็ตรหัสผ่านเป็นรหัสนักศึกษา"
+                        className="p-1.5 rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors flex-shrink-0"
+                      >
+                        {resettingId === u.id ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
                       </button>
                     )}
+                    {/* Toggle active */}
+                    <button onClick={() => toggleActive(u)} disabled={togglingId === u.id}
+                      className={cn("p-1.5 rounded-lg transition-colors flex-shrink-0",
+                        u.isActive
+                          ? "text-red-400 hover:text-red-600 hover:bg-red-50"
+                          : "text-green-500 hover:text-green-700 hover:bg-green-50"
+                      )}>
+                      {togglingId === u.id ? <Loader2 size={14} className="animate-spin" /> :
+                        u.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
+                    </button>
                   </div>
                 ))}
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Reset password confirm dialog */}
+      {resetConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <KeyRound size={20} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900">รีเซ็ตรหัสผ่าน</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  รีเซ็ตรหัสผ่านของ <span className="font-medium text-gray-800">{resetConfirm.firstName} {resetConfirm.lastName}</span><br />
+                  เป็นรหัสนักศึกษา <span className="font-mono font-medium text-blue-700">{resetConfirm.email.split("@")[0].replace(/^s/, "")}</span> ใช่ไหม?
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setResetConfirm(null)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={() => resetPassword(resetConfirm)}
+                disabled={resettingId === resetConfirm.id}
+                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors"
+              >
+                {resettingId === resetConfirm.id
+                  ? <Loader2 size={15} className="animate-spin" />
+                  : <KeyRound size={15} />}
+                รีเซ็ต
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+          <p className="text-xs text-gray-400">
+            แสดง {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, total)} จาก {total} รายการ
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 transition-colors"
+            >
+              <ChevronLeft size={14} className="text-gray-500" />
+            </button>
+            {(() => {
+              // Show at most 5 page buttons around current page
+              const range: number[] = [];
+              const start = Math.max(1, currentPage - 2);
+              const end   = Math.min(totalPages, currentPage + 2);
+              if (start > 1) range.push(1, -1);          // 1 ...
+              for (let p = start; p <= end; p++) range.push(p);
+              if (end < totalPages) range.push(-2, totalPages); // ... last
+              return range.map((p, i) =>
+                p < 0 ? (
+                  <span key={p} className="px-1 text-gray-300 text-xs">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentPage(p)}
+                    className={cn(
+                      "w-7 h-7 rounded-lg text-xs font-medium transition-colors",
+                      p === currentPage ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"
+                    )}
+                  >
+                    {p}
+                  </button>
+                )
+              );
+            })()}
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 transition-colors"
+            >
+              <ChevronRight size={14} className="text-gray-500" />
+            </button>
+          </div>
         </div>
       )}
     </div>

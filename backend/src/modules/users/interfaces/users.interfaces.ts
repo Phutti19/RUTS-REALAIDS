@@ -16,6 +16,7 @@ export interface UserRow {
   national_id: string | null;
   title: string | null;
   birth_date: Date | null;
+  faculty: string | null;
   department: string | null;
   year_of_study: number | null;
   position: string | null;
@@ -53,6 +54,7 @@ export interface UserProfile {
   nationalId: string | null;
   title: string | null;
   birthDate: Date | null;
+  faculty: string | null;
   department: string | null;
   yearOfStudy: number | null;
   position: string | null;

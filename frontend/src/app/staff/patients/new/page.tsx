@@ -16,6 +16,48 @@ interface UserResult {
   role: string;
 }
 
+const FACULTY_DEPARTMENTS: Record<string, string[]> = {
+  "คณะวิศวกรรมศาสตร์": [
+    "วิศวกรรมไฟฟ้า", "วิศวกรรมอิเล็กทรอนิกส์และโทรคมนาคม",
+    "วิศวกรรมคอมพิวเตอร์", "วิศวกรรมเครื่องกล",
+    "วิศวกรรมโยธา", "วิศวกรรมอุตสาหการ",
+    "วิศวกรรมเมคคาทรอนิกส์", "วิศวกรรมเคมีและวัสดุ",
+  ],
+  "คณะวิทยาศาสตร์และเทคโนโลยี": [
+    "เทคโนโลยีสารสนเทศ", "วิทยาการคอมพิวเตอร์",
+    "เคมี", "ฟิสิกส์", "คณิตศาสตร์", "สถิติ",
+    "เทคโนโลยีสิ่งแวดล้อม", "เทคโนโลยีชีวภาพ",
+  ],
+  "คณะครุศาสตร์อุตสาหกรรมและเทคโนโลยี": [
+    "วิศวกรรมไฟฟ้า (ค.อ.บ.)", "วิศวกรรมเครื่องกล (ค.อ.บ.)",
+    "วิศวกรรมคอมพิวเตอร์ (ค.อ.บ.)", "วิศวกรรมโยธา (ค.อ.บ.)",
+    "เทคโนโลยีคอมพิวเตอร์",
+  ],
+  "คณะสถาปัตยกรรมศาสตร์": [
+    "สถาปัตยกรรม", "การออกแบบสถาปัตยกรรมภายใน", "การออกแบบอุตสาหกรรม",
+  ],
+  "คณะบริหารธุรกิจ": [
+    "การบัญชี", "การตลาด", "การจัดการ",
+    "ระบบสารสนเทศทางธุรกิจ", "การเงินและการธนาคาร",
+  ],
+  "คณะเทคโนโลยีการจัดการ": [
+    "การจัดการ", "การบัญชี", "การตลาด", "เทคโนโลยีสารสนเทศธุรกิจ",
+  ],
+  "คณะเกษตรศาสตร์": [
+    "พืชศาสตร์", "สัตวศาสตร์", "อุตสาหกรรมเกษตร", "ประมง",
+  ],
+  "วิทยาลัยเทคโนโลยีอุตสาหกรรมและการจัดการ": [
+    "เทคโนโลยีไฟฟ้าอุตสาหกรรม", "เทคโนโลยีเครื่องกล", "การจัดการโลจิสติกส์",
+  ],
+  "คณะวิศวกรรมศาสตร์และเทคโนโลยี (ตรัง)": [
+    "วิศวกรรมเครื่องกล", "วิศวกรรมไฟฟ้า", "วิศวกรรมโยธา", "เทคโนโลยีสารสนเทศ",
+  ],
+  "คณะวิทยาศาสตร์และเทคโนโลยีการประมง": [
+    "วิทยาศาสตร์ทางทะเล", "การเพาะเลี้ยงสัตว์น้ำ", "ประมง", "เทคโนโลยีอาหาร",
+  ],
+  "อื่นๆ": [],
+};
+
 const VISIT_TYPES = [
   { value: "walk_in", label: "Walk-in", desc: "มาเองที่ห้องพยาบาล" },
   { value: "emergency", label: "ฉุกเฉิน", desc: "ต่อเนื่องจากเหตุฉุกเฉิน" },
@@ -56,8 +98,8 @@ export default function NewVisitPage() {
   const [regLastName, setRegLastName] = useState("");
   const [regStudentId, setRegStudentId] = useState("");
   const [regPhone, setRegPhone] = useState("");
+  const [regFaculty, setRegFaculty] = useState("");
   const [regDepartment, setRegDepartment] = useState("");
-  const [regYearOfStudy, setRegYearOfStudy] = useState("");
   const [regBirthDate, setRegBirthDate] = useState("");
   const [registering, setRegistering] = useState(false);
   const [regError, setRegError] = useState("");
@@ -102,8 +144,9 @@ export default function NewVisitPage() {
       lastName: regLastName.trim(),
       studentId: regStudentId.trim(),
       phone: regPhone.trim() || undefined,
+      faculty: regFaculty || undefined,
       department: regDepartment.trim() || undefined,
-      yearOfStudy: regYearOfStudy ? parseInt(regYearOfStudy) : undefined,
+
       birthDate: regBirthDate || undefined,
     });
     setRegistering(false);
@@ -230,7 +273,7 @@ export default function NewVisitPage() {
                   <UserPlus size={14} />
                   ลงทะเบียนผู้ป่วยใหม่
                 </p>
-                <button onClick={() => { setShowRegForm(false); setRegError(""); setRegTitle("นาย"); setRegFirstName(""); setRegLastName(""); setRegStudentId(""); setRegPhone(""); setRegDepartment(""); setRegYearOfStudy(""); setRegBirthDate(""); }}
+                <button onClick={() => { setShowRegForm(false); setRegError(""); setRegTitle("นาย"); setRegFirstName(""); setRegLastName(""); setRegStudentId(""); setRegPhone(""); setRegFaculty(""); setRegDepartment(""); setRegBirthDate(""); }}
                   className="text-blue-400 hover:text-blue-600">
                   <X size={15} />
                 </button>
@@ -282,30 +325,43 @@ export default function NewVisitPage() {
                 />
               </div>
 
-              {/* Department + Year */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-xs text-blue-700 font-medium mb-1 block">คณะ/สาขา</label>
-                  <input
-                    value={regDepartment}
-                    onChange={(e) => setRegDepartment(e.target.value)}
-                    placeholder="เช่น วิศวกรรมศาสตร์"
-                    className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-blue-700 font-medium mb-1 block">ชั้นปี</label>
-                  <select
-                    value={regYearOfStudy}
-                    onChange={(e) => setRegYearOfStudy(e.target.value)}
-                    className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                  >
-                    <option value="">-- ไม่ระบุ --</option>
-                    {[1,2,3,4,5,6].map((y) => (
-                      <option key={y} value={y}>ปี {y}</option>
-                    ))}
-                  </select>
-                </div>
+              {/* Faculty */}
+              <div>
+                <label className="text-xs text-blue-700 font-medium mb-1 block">คณะ</label>
+                <select
+                  value={regFaculty}
+                  onChange={(e) => { setRegFaculty(e.target.value); setRegDepartment(""); }}
+                  className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                >
+                  <option value="">-- ไม่ระบุ --</option>
+                  <option>คณะวิศวกรรมศาสตร์</option>
+                  <option>คณะวิทยาศาสตร์และเทคโนโลยี</option>
+                  <option>คณะครุศาสตร์อุตสาหกรรมและเทคโนโลยี</option>
+                  <option>คณะสถาปัตยกรรมศาสตร์</option>
+                  <option>คณะบริหารธุรกิจ</option>
+                  <option>คณะเทคโนโลยีการจัดการ</option>
+                  <option>คณะเกษตรศาสตร์</option>
+                  <option>วิทยาลัยเทคโนโลยีอุตสาหกรรมและการจัดการ</option>
+                  <option>คณะวิศวกรรมศาสตร์และเทคโนโลยี (ตรัง)</option>
+                  <option>คณะวิทยาศาสตร์และเทคโนโลยีการประมง</option>
+                  <option>อื่นๆ</option>
+                </select>
+              </div>
+
+              {/* Department */}
+              <div>
+                <label className="text-xs text-blue-700 font-medium mb-1 block">สาขาวิชา</label>
+                <select
+                  value={regDepartment}
+                  onChange={(e) => setRegDepartment(e.target.value)}
+                  disabled={!regFaculty}
+                  className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">{regFaculty ? "-- เลือกสาขา --" : "-- เลือกคณะก่อน --"}</option>
+                  {(FACULTY_DEPARTMENTS[regFaculty] ?? []).map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Birth date + auto age */}

@@ -50,7 +50,7 @@ export default function SlotsPage() {
   const [slotDuration, setSlotDuration] = useState(30);
 
   const load = () => {
-    api.get<AppointmentSlot[]>("/appointment-slots").then((res) => {
+    api.get<AppointmentSlot[]>("/appointment-slots?activeOnly=true").then((res) => {
       if (res.success) {
         setSlots(Array.isArray(res.data) ? (res.data as unknown as AppointmentSlot[]) : []);
       }

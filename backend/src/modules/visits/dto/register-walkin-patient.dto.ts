@@ -61,6 +61,12 @@ export class RegisterWalkInPatientDto {
   @IsString()
   @MaxLength(200)
   @Transform(({ value }: { value: string }) => value?.trim() || null)
+  faculty?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  @Transform(({ value }: { value: string }) => value?.trim() || null)
   department?: string | null;
 
   @IsOptional()

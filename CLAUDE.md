@@ -146,43 +146,52 @@ ruts-realaids/
 ## Database Schema (24 Tables)
 
 ### Users & Security (5 tables)
-- `users` — id, student_id, email, password_hash, first_name, last_name, phone, role, is_active
-- `student_health_profiles` — user_id (1:1), blood_type, allergies, chronic_diseases, emergency_contact
-- `refresh_tokens` — user_id, token_hash, expires_at, revoked_at
+- `users` — id, student_id, email, password_hash, first_name, last_name, phone, role, avatar_url, is_active, last_login_at; extra profile fields: **national_id** (varchar 13), **title**, **birth_date**, **department**, **year_of_study** (smallint), **position**, **faculty** — student-specific: student_id/department/faculty/year_of_study; staff-specific: position
+- `student_health_profiles` — user_id (1:1 UNIQUE), blood_type, allergies, chronic_diseases, **current_medications**, **emergency_contact_name** (NOT NULL), **emergency_contact_phone** (NOT NULL), **emergency_contact_relation**
+- `refresh_tokens` — user_id, token_hash, **device_info**, expires_at, revoked_at
 - `password_reset_tokens` — user_id, token_hash, expires_at, used_at
-- `login_attempts` — email, ip_address, success, failure_reason
+- `login_attempts` — user_id (nullable), email, ip_address, **user_agent**, success, failure_reason
 
 ### Emergency (5 tables)
 
-- `emergency_incidents` — reporter_id, incident_type, severity, latitude (NOT NULL), longitude (NOT NULL), location_name (nullable), status (pending→accepted→in_progress→completed)
+- `emergency_incidents` — reporter_id, incident_type, severity, latitude (NOT NULL), longitude (NOT NULL), location_name (nullable), status (pending→accepted→in_progress→completed), responded_at, resolved_at
 - `incident_images` — incident_id, image_url, caption, sort_order (default 0), **uploaded_at** (NOT NULL, ไม่ใช่ created_at)
-- `incident_responders` — incident_id, responder_id, accepted_at, arrived_at — unique constraint: **(incident_id, responder_id)**
+- `incident_responders` — incident_id, responder_id, accepted_at, arrived_at, **notes** (nullable) — unique constraint: **(incident_id, responder_id)**
 - `incident_status_logs` — incident_id, changed_by, **old_status** (NOT NULL), new_status, note — ห้าม INSERT NULL สำหรับ old_status
-- `emergency_contacts_directory` — name, category (hospital/police/rescue/fire), phone
+- `emergency_contacts_directory` — name, category (hospital/police/rescue/fire/**other**), phone, phone_secondary, address, latitude, longitude, note, is_primary, is_active
 
 ### Infirmary (4 tables)
-- `treatment_types` — name (wound care, medication, vital signs, etc.)
-- `patient_visits` — patient_id, staff_id, incident_id, chief_complaint, diagnosis, vital_signs (JSONB), **treatment** (NOT NULL ไม่ใช่ treatment_notes), status, completed_at (ไม่ใช่ updated_at)
+- `treatment_types` — name (wound care, medication, vital signs, etc.), is_active
+- `patient_visits` — patient_id, staff_id, incident_id, visit_type, chief_complaint, diagnosis, **treatment** (nullable text, ไม่ใช่ treatment_notes), treatment_type_id (FK treatment_types), vital_signs (JSONB), status, referred_to, notes, visited_at, completed_at (ไม่ใช่ updated_at); extra fields: **illness_history**, **wound_care** (boolean NOT NULL default false), **rest_hours** (numeric 4,1), **consultation_types** (text[] NOT NULL default '{}'), **is_referred** (boolean NOT NULL default false)
 - `visit_medications` — visit_id, medicine_id, batch_id, quantity, dosage_instruction, **dispensed_by** (NOT NULL)
-- `medical_certificates` — visit_id, certificate_number (auto CERT-YYYY-NNNNNN), diagnosis_text, rest_days, recommendation, rest_start_date, rest_end_date
+- `medical_certificates` — visit_id, **issued_by** (NOT NULL FK users), certificate_number (auto CERT-YYYY-NNNNNN), diagnosis_text, rest_days, recommendation, rest_start_date, rest_end_date, **issued_at**
 
 ### Medicines (3 tables)
-- `medicines` — name, category (medicine/supply/equipment), stock_quantity (cached), min_stock_level
+- `medicines` — name, generic_name, category (medicine/supply/equipment), unit (NOT NULL), description, stock_quantity (cached), min_stock_level, location, is_active
 - `medicine_batches` — medicine_id, batch_number, quantity, expiry_date, **received_by** (NOT NULL), received_at (default now()), note
-- `medicine_stock_logs` — medicine_id, batch_id, action (received/dispensed/expired/adjusted), quantity_change, **remaining_stock** (NOT NULL), **performed_by** (NOT NULL), **note** (ไม่ใช่ notes)
+- `medicine_stock_logs` — medicine_id, batch_id, action (received/dispensed/expired/adjusted), quantity_change, **remaining_stock** (NOT NULL), **reference_id** (uuid nullable — polymorphic link to visit/etc), **performed_by** (NOT NULL), **note** (ไม่ใช่ notes)
 
 ### Appointments (2 tables)
-- `appointment_slots` — staff_id, day_of_week, start_time, end_time, slot_duration_minutes
+- `appointment_slots` — staff_id, day_of_week (0-6), start_time, end_time, slot_duration_minutes, **max_patients_per_slot** (NOT NULL default 1), is_active
 - `appointments` — patient_id, staff_id, slot_id, **appointment_date** (NOT NULL), **appointment_time** (NOT NULL), **reason** (NOT NULL), notes (nullable), status (scheduled/checked_in/completed/cancelled), cancel_reason
 
 ### Notifications (2 tables)
-- `notifications` — user_id, type, title, message, reference_type, reference_id, is_read
-- `push_subscriptions` — user_id, endpoint, p256dh_key, auth_key (Web Push API)
+- `notifications` — user_id, type, title, message, reference_type, reference_id (polymorphic), is_read, **read_at**
+- `push_subscriptions` — user_id, endpoint, p256dh_key, auth_key, **device_info**, **is_active** (Web Push API)
 
 ### System (3 tables)
 - `system_settings` — key/value pairs (infirmary_lat/lng, alert thresholds, etc.)
 - `audit_logs` — user_id, action, entity_type, entity_id, old_values, new_values (JSONB)
 - `data_backups` — filename, backup_type, status, **file_size_bytes**, **performed_by** (ไม่ใช่ file_size / created_by), note, started_at, completed_at
+
+### Polymorphic References (ไม่มี FK constraint — application layer enforce)
+
+- `medicine_stock_logs.reference_id` → `patient_visits.id` เมื่อ action=`dispensed` จาก visit
+- `notifications.reference_type` + `notifications.reference_id`:
+  - `'incident'` → `emergency_incidents.id`
+  - `'appointment'` → `appointments.id`
+  - `'visit'` → `patient_visits.id`
+  - `'medicine'` → `medicines.id`
 
 ### Helper Views
 - `v_medicines_expiring_soon` — medicines expiring within 30 days (from batches)
@@ -203,6 +212,9 @@ medicine_category: medicine | supply | equipment
 stock_action: received | dispensed | expired | adjusted
 appointment_status: scheduled | checked_in | completed | cancelled | no_show
 notification_type: emergency | appointment | stock_alert | system | expiry_alert
+emergency_contact_category: hospital | police | rescue | fire | other
+backup_type: manual | auto
+backup_status: in_progress | completed | failed
 ```
 
 ## Frontend Pages

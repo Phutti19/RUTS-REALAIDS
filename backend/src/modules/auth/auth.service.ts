@@ -12,6 +12,7 @@ import bcrypt from 'bcryptjs';
 import { DatabaseService } from '../../database/db.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ActivateAccountDto } from './dto/activate-account.dto';
 import {
   UserRow,
   RefreshTokenRow,
@@ -47,10 +48,10 @@ export class AuthService {
       );
     }
 
-    // 2. Find user by email
+    // 2. Find user by email or student_id
     const user = await this.db.queryOne<UserRow>(
-      `SELECT id, student_id, email, password_hash, first_name, last_name, phone, role, is_active
-       FROM users WHERE email = $1`,
+      `SELECT id, student_id, email, password_hash, first_name, last_name, phone, role, is_active, faculty, department
+       FROM users WHERE email = $1 OR student_id = $1`,
       [email],
     );
 
@@ -123,6 +124,57 @@ export class AuthService {
     return { message: 'Registration successful. You can now log in.' };
   }
 
+  /**
+   * Look up a student account by student_id.
+   * Returns { firstName, lastName, maskedEmail } for identity confirmation.
+   * Used by the password-change flow (/register page).
+   */
+  async lookupUnactivated(studentId: string): Promise<{ firstName: string; lastName: string; maskedEmail: string }> {
+    const user = await this.db.queryOne<{ first_name: string; last_name: string; email: string }>(
+      `SELECT first_name, last_name, email FROM users
+       WHERE student_id = $1 AND role = 'student' AND is_active = true`,
+      [studentId],
+    );
+
+    if (!user) {
+      throw new BadRequestException('ไม่พบรหัสนักศึกษานี้ในระบบ กรุณาติดต่อเจ้าหน้าที่');
+    }
+
+    // Mask email: e.g. phuttiwat.b@rmutsv.ac.th → p*******t.b@rmutsv.ac.th
+    const [local, domain] = user.email.split('@');
+    const masked = local!.length <= 2
+      ? `${local}@${domain}`
+      : `${local![0]}${'*'.repeat(local!.length - 2)}${local![local!.length - 1]}@${domain}`;
+
+    return { firstName: user.first_name, lastName: user.last_name, maskedEmail: masked };
+  }
+
+  /**
+   * Change password for a student using their student_id.
+   * Works for all active students — used for both initial and subsequent password changes.
+   */
+  async activateAccount(dto: ActivateAccountDto): Promise<{ message: string }> {
+    const user = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM users
+       WHERE student_id = $1 AND role = 'student' AND is_active = true`,
+      [dto.studentId],
+    );
+
+    if (!user) {
+      throw new BadRequestException('ไม่พบรหัสนักศึกษานี้ในระบบ');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+
+    await this.db.execute(
+      `UPDATE users SET password_hash = $1 WHERE id = $2`,
+      [passwordHash, user.id],
+    );
+
+    this.logger.log(`Password changed via student ID: studentId=${dto.studentId} userId=${user.id}`);
+    return { message: 'เปลี่ยนรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบ' };
+  }
+
   async refresh(rawRefreshToken: string): Promise<AccessTokenResponse> {
     const tokenHash = this.hashToken(rawRefreshToken);
 
@@ -137,7 +189,8 @@ export class AuthService {
       }
     >(
       `SELECT rt.user_id, u.role, u.is_active,
-              u.email, u.first_name, u.last_name, u.student_id, u.phone
+              u.email, u.first_name, u.last_name, u.student_id, u.phone,
+              u.faculty, u.department
        FROM refresh_tokens rt
        JOIN users u ON rt.user_id = u.id
        WHERE rt.token_hash = $1
@@ -163,6 +216,8 @@ export class AuthService {
       lastName: tokenRow.last_name,
       studentId: tokenRow.student_id,
       phone: tokenRow.phone ?? null,
+      faculty: tokenRow.faculty ?? null,
+      department: tokenRow.department ?? null,
     };
     return { accessToken, user };
   }
@@ -287,6 +342,8 @@ export class AuthService {
       lastName: user.last_name,
       studentId: user.student_id,
       phone: user.phone ?? null,
+      faculty: user.faculty ?? null,
+      department: user.department ?? null,
     };
 
     return { accessToken, refreshToken: rawRefreshToken, user: authUser };

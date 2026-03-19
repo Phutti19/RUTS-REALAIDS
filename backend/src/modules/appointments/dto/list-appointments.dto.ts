@@ -20,12 +20,20 @@ export class ListAppointmentsDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(500)
   limit?: number = 20;
 
   @IsOptional()
   @IsDateString()
   date?: string;
+
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 
   @IsOptional()
   @IsEnum(['scheduled', 'checked_in', 'completed', 'cancelled', 'no_show'])

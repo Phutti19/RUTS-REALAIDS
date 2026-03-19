@@ -34,6 +34,9 @@ export interface AdminUserRow {
   role: 'student' | 'staff' | 'admin';
   is_active: boolean;
   created_at: Date;
+  student_id: string | null;
+  faculty: string | null;
+  department: string | null;
 }
 
 export interface AdminUser {
@@ -46,6 +49,9 @@ export interface AdminUser {
   role: 'student' | 'staff' | 'admin';
   isActive: boolean;
   createdAt: Date;
+  studentId: string | null;
+  faculty: string | null;
+  department: string | null;
 }
 
 // ── Data Backup ───────────────────────────────────────────────────────────────

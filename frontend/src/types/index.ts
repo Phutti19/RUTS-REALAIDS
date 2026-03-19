@@ -32,6 +32,7 @@ export interface User {
   nationalId: string | null;
   title: string | null;
   birthDate: string | null;
+  faculty: string | null;
   department: string | null;
   yearOfStudy: number | null;
   position: string | null;

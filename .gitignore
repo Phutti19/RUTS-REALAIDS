@@ -107,5 +107,12 @@ playwright-report/
 test-results/
 e2e/.auth/
 
-#Docker
-.tar
+# Docker
+*.tar
+ruts-realaids.tar
+
+# .gitkeep (no longer needed)
+.gitkeep
+
+# Server uploads folder
+server/

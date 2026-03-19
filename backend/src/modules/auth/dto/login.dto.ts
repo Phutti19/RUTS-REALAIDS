@@ -1,8 +1,10 @@
-import { IsEmail, IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class LoginDto {
-  @IsEmail({}, { message: 'Invalid email format' })
+  /** Accepts email address or student ID (12-digit) */
+  @IsString()
+  @IsNotEmpty({ message: 'Email or student ID is required' })
   @Transform(({ value }: { value: string }) => value?.toLowerCase().trim())
   email: string;
 

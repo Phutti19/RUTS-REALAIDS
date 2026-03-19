@@ -101,7 +101,7 @@ export class ReportsService {
       this.db.queryMany<{ status: string; count: string }>(
         `SELECT status::text, COUNT(*)::text AS count
          FROM appointments
-         WHERE appointment_date = CURRENT_DATE
+         WHERE appointment_date = (NOW() AT TIME ZONE 'Asia/Bangkok')::date
          GROUP BY status`,
       ),
     ]);

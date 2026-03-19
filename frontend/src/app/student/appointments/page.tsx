@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   Calendar,
   ChevronRight,
+  ChevronLeft,
   Clock,
   CheckCircle2,
   XCircle,
@@ -29,18 +30,7 @@ const DAY_TH: Record<string, string> = {
   sunday: "อาทิตย์",
 };
 
-const DAY_SHORT = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
-
-function getUpcomingDates(): string[] {
-  const dates: string[] = [];
-  const today = new Date();
-  for (let i = 0; i < 14; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    dates.push(d.toLocaleDateString("en-CA")); // local date (not UTC)
-  }
-  return dates;
-}
+const DOW_HEADER = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 
 function isSlotPast(date: string, startTime: string): boolean {
   const todayStr = new Date().toLocaleDateString("en-CA");
@@ -56,6 +46,169 @@ function getDayName(dateStr: string): string {
   const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
   return days[new Date(dateStr).getDay()]!;
 }
+
+/* ── Calendar Picker ─────────────────────────────────────────────────────── */
+
+function CalendarPicker({
+  selectedDate,
+  onSelect,
+  appointments,
+}: {
+  selectedDate: string;
+  onSelect: (date: string) => void;
+  appointments: Appointment[];
+}) {
+  const today = new Date().toLocaleDateString("en-CA");
+  const todayObj = new Date();
+
+  const [viewYear, setViewYear] = useState(() => todayObj.getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => todayObj.getMonth());
+
+  const firstDay = new Date(viewYear, viewMonth, 1);
+  const lastDay = new Date(viewYear, viewMonth + 1, 0);
+  const startDow = firstDay.getDay(); // 0 = Sun
+
+  // Build grid cells: null = empty, string = date ISO
+  const cells: (string | null)[] = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    cells.push(new Date(viewYear, viewMonth, d).toLocaleDateString("en-CA"));
+  }
+
+  // Pad to complete last row
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const aptDates = new Set(appointments.map((a) => a.appointmentDate));
+
+  // Min viewable = current month
+  const isCurrentMonth =
+    viewYear === todayObj.getFullYear() && viewMonth === todayObj.getMonth();
+
+  const prevMonth = () => {
+    if (isCurrentMonth) return;
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear((y) => y - 1);
+    } else {
+      setViewMonth((m) => m - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear((y) => y + 1);
+    } else {
+      setViewMonth((m) => m + 1);
+    }
+  };
+
+  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString("th-TH", {
+    month: "long",
+    year: "numeric",
+  });
+
+  return (
+    <div>
+      {/* Month navigation */}
+      <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={prevMonth}
+          disabled={isCurrentMonth}
+          className={cn(
+            "w-8 h-8 rounded-xl flex items-center justify-center transition-colors",
+            isCurrentMonth
+              ? "text-gray-200 cursor-not-allowed"
+              : "text-gray-500 hover:bg-gray-100"
+          )}
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <p className="text-sm font-bold text-gray-800">{monthLabel}</p>
+        <button
+          onClick={nextMonth}
+          className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+
+      {/* Day-of-week headers */}
+      <div className="grid grid-cols-7 mb-1">
+        {DOW_HEADER.map((d, i) => (
+          <div
+            key={d}
+            className={cn(
+              "text-center text-xs font-medium py-1",
+              i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-gray-400"
+            )}
+          >
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Date grid */}
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((date, i) => {
+          if (!date) return <div key={`empty-${i}`} />;
+
+          const isPast = date < today;
+          const isToday = date === today;
+          const isSelected = date === selectedDate;
+          const hasApt = aptDates.has(date);
+          const dow = new Date(date).getDay();
+
+          return (
+            <button
+              key={date}
+              onClick={() => !isPast && onSelect(date)}
+              disabled={isPast}
+              className={cn(
+                "relative aspect-square rounded-xl flex flex-col items-center justify-center text-sm font-semibold transition-all select-none",
+                isPast
+                  ? "text-gray-200 cursor-not-allowed"
+                  : isSelected
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-200 scale-105"
+                  : isToday
+                  ? "bg-blue-50 text-blue-600 ring-2 ring-blue-300"
+                  : dow === 0
+                  ? "text-red-500 hover:bg-red-50"
+                  : dow === 6
+                  ? "text-blue-500 hover:bg-blue-50"
+                  : "text-gray-700 hover:bg-gray-100"
+              )}
+            >
+              <span>{parseInt(date.split("-")[2] ?? "0")}</span>
+              {hasApt && (
+                <span
+                  className={cn(
+                    "absolute bottom-1 w-1.5 h-1.5 rounded-full",
+                    isSelected ? "bg-white/80" : "bg-blue-400"
+                  )}
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 mt-3 text-[11px] text-gray-400">
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
+          มีนัดหมาย
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-4 h-4 rounded-lg bg-blue-50 ring-2 ring-blue-300 inline-block" />
+          วันนี้
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Main Page ───────────────────────────────────────────────────────────── */
 
 export default function StudentAppointmentsPage() {
   const [tab, setTab] = useState<"upcoming" | "create" | "history">("upcoming");
@@ -73,8 +226,6 @@ export default function StudentAppointmentsPage() {
   const [bookSuccess, setBookSuccess] = useState(false);
   const [detailApt, setDetailApt] = useState<Appointment | null>(null);
 
-  const dates = getUpcomingDates();
-
   useEffect(() => {
     api.get<Appointment[]>("/appointments/my").then((res) => {
       if (res.success)
@@ -84,13 +235,17 @@ export default function StudentAppointmentsPage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedDate) { setSlots([]); return; }
+    if (!selectedDate) {
+      setSlots([]);
+      return;
+    }
     setLoadingSlots(true);
     setSelectedSlot(null);
     api
       .get<AppointmentSlot[]>(`/appointment-slots/available?date=${selectedDate}`)
       .then((res) => {
-        if (res.success) setSlots(Array.isArray(res.data) ? (res.data as unknown as AppointmentSlot[]) : []);
+        if (res.success)
+          setSlots(Array.isArray(res.data) ? (res.data as unknown as AppointmentSlot[]) : []);
         else setSlots([]);
         setLoadingSlots(false);
       });
@@ -136,10 +291,15 @@ export default function StudentAppointmentsPage() {
       (["scheduled", "checked_in"].includes(a.status) && a.appointmentDate < todayStr)
   );
 
-  const canBook = !!selectedSlot && !!selectedDate && reason.trim().length > 0 && !booking && !isSlotPast(selectedDate, selectedSlot?.startTime ?? "");
+  const canBook =
+    !!selectedSlot &&
+    !!selectedDate &&
+    reason.trim().length > 0 &&
+    !booking &&
+    !isSlotPast(selectedDate, selectedSlot?.startTime ?? "");
 
   return (
-    <div className="bg-gray-50">
+    <div className="bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 pt-10 pb-4">
         <h1 className="font-bold text-xl text-gray-900">การนัดหมาย</h1>
@@ -188,7 +348,9 @@ export default function StudentAppointmentsPage() {
                 </button>
               </div>
             ) : (
-              upcoming.map((apt) => <AppointmentCard key={apt.id} apt={apt} onClick={() => setDetailApt(apt)} />)
+              upcoming.map((apt) => (
+                <AppointmentCard key={apt.id} apt={apt} onClick={() => setDetailApt(apt)} />
+              ))
             )}
           </div>
         )}
@@ -204,51 +366,33 @@ export default function StudentAppointmentsPage() {
               </div>
             ) : (
               <>
-                {/* Step 1: Date */}
+                {/* Step 1: Calendar */}
                 <div className="bg-white rounded-2xl shadow-sm p-4">
-                  <h2 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                    <span className="w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">1</span>
+                  <h2 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+                    <span className="w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">
+                      1
+                    </span>
                     เลือกวันนัดหมาย
                   </h2>
-                  <div className="overflow-x-auto -mx-1">
-                    <div className="flex gap-2 pb-1 px-1">
-                      {dates.map((date) => {
-                        const d = new Date(date);
-                        const isSelected = selectedDate === date;
-                        const isToday = date === todayStr;
-                        return (
-                          <button
-                            key={date}
-                            onClick={() => setSelectedDate(date)}
-                            className={cn(
-                              "flex-shrink-0 w-14 py-2 rounded-xl text-center transition-all",
-                              isSelected
-                                ? "bg-blue-600 text-white shadow-md shadow-blue-200"
-                                : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100"
-                            )}
-                          >
-                            <div className="text-[10px] font-medium opacity-70">
-                              {DAY_SHORT[d.getDay()]}
-                              {isToday && " (วันนี้)"}
-                            </div>
-                            <div className="text-lg font-extrabold leading-tight mt-0.5">
-                              {d.getDate()}
-                            </div>
-                            <div className="text-[10px] opacity-60">
-                              {d.toLocaleDateString("th-TH", { month: "short" })}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <CalendarPicker
+                    selectedDate={selectedDate}
+                    onSelect={setSelectedDate}
+                    appointments={appointments}
+                  />
+                  {selectedDate && (
+                    <p className="mt-3 text-xs text-center text-blue-600 font-semibold">
+                      {formatDate(selectedDate)} ({DAY_TH[getDayName(selectedDate)]})
+                    </p>
+                  )}
                 </div>
 
                 {/* Step 2: Slot */}
                 {selectedDate && (
                   <div className="bg-white rounded-2xl shadow-sm p-4">
                     <h2 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                      <span className="w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">2</span>
+                      <span className="w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">
+                        2
+                      </span>
                       เลือกเวลา
                     </h2>
                     {loadingSlots ? (
@@ -286,7 +430,9 @@ export default function StudentAppointmentsPage() {
                                 <User size={11} /> {slot.staffName}
                               </div>
                               {past && <p className="text-[10px] text-gray-400 mt-1">เวลาผ่านไปแล้ว</p>}
-                              {slot.isFull && !past && <p className="text-[10px] text-gray-400 mt-1">เต็มแล้ว</p>}
+                              {slot.isFull && !past && (
+                                <p className="text-[10px] text-gray-400 mt-1">เต็มแล้ว</p>
+                              )}
                             </button>
                           );
                         })}
@@ -299,7 +445,9 @@ export default function StudentAppointmentsPage() {
                 {selectedSlot && (
                   <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
                     <h2 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                      <span className="w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">3</span>
+                      <span className="w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">
+                        3
+                      </span>
                       รายละเอียดการนัด
                     </h2>
 
@@ -321,7 +469,8 @@ export default function StudentAppointmentsPage() {
 
                     <div>
                       <label className="text-xs text-gray-500 font-medium mb-1 block">
-                        หมายเหตุเพิ่มเติม <span className="text-gray-400">(ไม่บังคับ)</span>
+                        หมายเหตุเพิ่มเติม{" "}
+                        <span className="text-gray-400">(ไม่บังคับ)</span>
                       </label>
                       <textarea
                         value={notes}
@@ -340,12 +489,12 @@ export default function StudentAppointmentsPage() {
                   <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
                     <p className="text-sm font-bold text-blue-800 mb-2">สรุปการนัด</p>
                     <div className="space-y-1 text-sm text-blue-700">
-                      <p>
-                        📅 {formatDate(selectedDate)} ({DAY_TH[getDayName(selectedDate)]})
-                      </p>
+                      <p>📅 {formatDate(selectedDate)} ({DAY_TH[getDayName(selectedDate)]})</p>
                       <p>⏰ {selectedSlot.startTime.slice(0, 5)} น.</p>
                       <p>👨‍⚕️ {selectedSlot.staffName}</p>
-                      {reason && <p className="text-blue-600 text-xs mt-1 truncate">📋 {reason}</p>}
+                      {reason && (
+                        <p className="text-blue-600 text-xs mt-1 truncate">📋 {reason}</p>
+                      )}
                     </div>
 
                     {bookError && (
@@ -365,7 +514,10 @@ export default function StudentAppointmentsPage() {
                       )}
                     >
                       {booking ? (
-                        <><Loader2 size={16} className="animate-spin" />กำลังจอง...</>
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          กำลังจอง...
+                        </>
                       ) : (
                         "ยืนยันการจอง"
                       )}
@@ -395,7 +547,9 @@ export default function StudentAppointmentsPage() {
                 <p className="text-gray-400 text-sm">ยังไม่มีประวัตินัดหมาย</p>
               </div>
             ) : (
-              history.map((apt) => <AppointmentCard key={apt.id} apt={apt} onClick={() => setDetailApt(apt)} />)
+              history.map((apt) => (
+                <AppointmentCard key={apt.id} apt={apt} onClick={() => setDetailApt(apt)} />
+              ))
             )}
           </div>
         )}
@@ -409,45 +563,43 @@ export default function StudentAppointmentsPage() {
   );
 }
 
+/* ── Sub-components ──────────────────────────────────────────────────────── */
+
 function AppointmentDetailSheet({ apt, onClose }: { apt: Appointment; onClose: () => void }) {
   const statusConfig: Record<string, { color: string; bg: string; border: string }> = {
-    scheduled:  { color: "text-blue-700",   bg: "bg-blue-50",   border: "border-blue-200" },
-    checked_in: { color: "text-green-700",  bg: "bg-green-50",  border: "border-green-200" },
-    completed:  { color: "text-gray-600",   bg: "bg-gray-100",  border: "border-gray-200" },
-    cancelled:  { color: "text-red-700",    bg: "bg-red-50",    border: "border-red-200" },
-    no_show:    { color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200" },
+    scheduled: { color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200" },
+    checked_in: { color: "text-green-700", bg: "bg-green-50", border: "border-green-200" },
+    completed: { color: "text-gray-600", bg: "bg-gray-100", border: "border-gray-200" },
+    cancelled: { color: "text-red-700", bg: "bg-red-50", border: "border-red-200" },
+    no_show: { color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200" },
   };
   const cfg = statusConfig[apt.status] ?? statusConfig.scheduled!;
   const d = new Date(apt.appointmentDate);
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/40 z-40"
-        onClick={onClose}
-      />
-      {/* Sheet */}
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white rounded-t-3xl z-50 pb-8 shadow-2xl">
-        {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-gray-200 rounded-full" />
         </div>
-
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
           <h3 className="font-bold text-gray-900">รายละเอียดการนัด</h3>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100">
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100"
+          >
             <X size={17} className="text-gray-500" />
           </button>
         </div>
 
         <div className="px-5 pt-4 space-y-4">
-          {/* Date + time */}
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-blue-600 rounded-2xl flex flex-col items-center justify-center text-white flex-shrink-0">
               <span className="text-2xl font-extrabold leading-none">{d.getDate()}</span>
-              <span className="text-blue-200 text-xs">{d.toLocaleDateString("th-TH", { month: "short" })}</span>
+              <span className="text-blue-200 text-xs">
+                {d.toLocaleDateString("th-TH", { month: "short" })}
+              </span>
             </div>
             <div>
               <p className="text-lg font-bold text-gray-900 flex items-center gap-1.5">
@@ -455,20 +607,32 @@ function AppointmentDetailSheet({ apt, onClose }: { apt: Appointment; onClose: (
                 {apt.appointmentTime.slice(0, 5)} น.
               </p>
               <p className="text-sm text-gray-500 mt-0.5">
-                {d.toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                {d.toLocaleDateString("th-TH", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
               </p>
             </div>
           </div>
 
-          {/* Status badge */}
-          <div className={cn("flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold", cfg.bg, cfg.color, cfg.border)}>
-            {apt.status === "cancelled" || apt.status === "no_show"
-              ? <XCircle size={15} />
-              : <CheckCircle2 size={15} />}
+          <div
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold",
+              cfg.bg,
+              cfg.color,
+              cfg.border
+            )}
+          >
+            {apt.status === "cancelled" || apt.status === "no_show" ? (
+              <XCircle size={15} />
+            ) : (
+              <CheckCircle2 size={15} />
+            )}
             {statusLabel(apt.status)}
           </div>
 
-          {/* Staff */}
           <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
             <Row icon={<Stethoscope size={15} className="text-blue-500" />} label="เจ้าหน้าที่" value={apt.staffName} />
             <Row icon={<FileText size={15} className="text-purple-500" />} label="เหตุผลการนัด" value={apt.reason} />
@@ -531,8 +695,10 @@ function AppointmentCard({ apt, onClick }: { apt: Appointment; onClick: () => vo
   const d = new Date(apt.appointmentDate);
 
   return (
-    <button onClick={onClick} className="w-full bg-white rounded-2xl shadow-sm overflow-hidden flex text-left active:scale-[0.98] transition-transform">
-      {/* Date column */}
+    <button
+      onClick={onClick}
+      className="w-full bg-white rounded-2xl shadow-sm overflow-hidden flex text-left active:scale-[0.98] transition-transform"
+    >
       <div className="w-16 bg-blue-600 flex flex-col items-center justify-center text-white flex-shrink-0 py-4">
         <span className="text-2xl font-extrabold leading-none">{d.getDate()}</span>
         <span className="text-blue-200 text-xs mt-0.5">
@@ -542,26 +708,27 @@ function AppointmentCard({ apt, onClick }: { apt: Appointment; onClick: () => vo
           {d.toLocaleDateString("th-TH", { year: "numeric" })}
         </span>
       </div>
-
-      {/* Details */}
       <div className="flex-1 min-w-0 p-3 flex flex-col justify-center">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
             <Clock size={13} className="text-blue-400" />
             {apt.appointmentTime.slice(0, 5)} น.
           </p>
-          <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0", cfg.bg, cfg.color)}>
+          <span
+            className={cn(
+              "text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0",
+              cfg.bg,
+              cfg.color
+            )}
+          >
             {statusLabel(apt.status)}
           </span>
         </div>
         <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
           <User size={11} /> {apt.staffName}
         </p>
-        {apt.reason && (
-          <p className="text-xs text-gray-400 truncate mt-0.5">{apt.reason}</p>
-        )}
+        {apt.reason && <p className="text-xs text-gray-400 truncate mt-0.5">{apt.reason}</p>}
       </div>
-
       <div className="flex items-center pr-3">
         <ChevronRight size={15} className="text-gray-300" />
       </div>

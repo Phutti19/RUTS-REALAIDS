@@ -61,6 +61,8 @@ function EmergencyPageContent() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [infirmaryName, setInfirmaryName] = useState("ห้องพยาบาล");
+  const [infirmaryLat, setInfirmaryLat] = useState<number | undefined>(undefined);
+  const [infirmaryLng, setInfirmaryLng] = useState<number | undefined>(undefined);
 
   const loadIncidents = useCallback(async () => {
     const [pendingRes, inProgressRes, completedRes] = await Promise.all([
@@ -78,8 +80,12 @@ function EmergencyPageContent() {
 
   useEffect(() => {
     loadIncidents();
-    api.get<{ name: string | null }>("/settings/infirmary").then((res) => {
-      if (res.success && res.data?.name) setInfirmaryName(res.data.name);
+    api.get<{ name: string | null; lat: number | null; lng: number | null }>("/settings/infirmary").then((res) => {
+      if (res.success && res.data) {
+        if (res.data.name) setInfirmaryName(res.data.name);
+        if (res.data.lat != null) setInfirmaryLat(res.data.lat);
+        if (res.data.lng != null) setInfirmaryLng(res.data.lng);
+      }
     });
   }, [loadIncidents]);
 
@@ -243,6 +249,8 @@ function EmergencyPageContent() {
               selectedId={selectedIncident?.id}
               onSelectIncident={(inc) => openDetail(inc.id)}
               infirmaryName={infirmaryName}
+              infirmaryLat={infirmaryLat}
+              infirmaryLng={infirmaryLng}
             />
           </div>
           {selectedIncident && (
