@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Search, Loader2, User, AlertCircle, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Search, Loader2, User, AlertCircle, UserPlus, X, GraduationCap, Briefcase, UserRound } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+
+type PatientType = "student" | "staff_member" | "external";
 
 interface UserResult {
   id: string;
@@ -93,6 +95,7 @@ export default function NewVisitPage() {
 
   // Inline registration form
   const [showRegForm, setShowRegForm] = useState(false);
+  const [regPatientType, setRegPatientType] = useState<PatientType>("student");
   const [regTitle, setRegTitle] = useState("นาย");
   const [regFirstName, setRegFirstName] = useState("");
   const [regLastName, setRegLastName] = useState("");
@@ -101,6 +104,8 @@ export default function NewVisitPage() {
   const [regFaculty, setRegFaculty] = useState("");
   const [regDepartment, setRegDepartment] = useState("");
   const [regBirthDate, setRegBirthDate] = useState("");
+  const [regNationalId, setRegNationalId] = useState("");
+  const [regPosition, setRegPosition] = useState("");
   const [registering, setRegistering] = useState(false);
   const [regError, setRegError] = useState("");
 
@@ -116,7 +121,7 @@ export default function NewVisitPage() {
     const t = setTimeout(async () => {
       setSearching(true);
       setSearched(false);
-      const res = await api.get<UserResult[]>(`/users?search=${encodeURIComponent(search)}&role=student&limit=8`);
+      const res = await api.get<UserResult[]>(`/users?search=${encodeURIComponent(search)}&limit=8`);
       if (res.success) {
         setResults(Array.isArray(res.data) ? (res.data as unknown as UserResult[]) : []);
       }
@@ -135,19 +140,22 @@ export default function NewVisitPage() {
   };
 
   const handleRegister = async () => {
-    if (!regFirstName.trim() || !regLastName.trim() || !regStudentId.trim()) return;
+    if (!regFirstName.trim() || !regLastName.trim()) return;
+    if (regPatientType === "student" && !regStudentId.trim()) return;
     setRegistering(true);
     setRegError("");
     const res = await api.post<UserResult>("/visits/register-patient", {
+      patientType: regPatientType,
       title: regTitle,
       firstName: regFirstName.trim(),
       lastName: regLastName.trim(),
-      studentId: regStudentId.trim(),
+      studentId: regStudentId.trim() || undefined,
       phone: regPhone.trim() || undefined,
       faculty: regFaculty || undefined,
       department: regDepartment.trim() || undefined,
-
       birthDate: regBirthDate || undefined,
+      nationalId: regNationalId.trim() || undefined,
+      position: regPosition.trim() || undefined,
     });
     setRegistering(false);
     if (res.success && res.data) {
@@ -155,6 +163,12 @@ export default function NewVisitPage() {
     } else {
       setRegError(res.message ?? "เกิดข้อผิดพลาด");
     }
+  };
+
+  const resetRegForm = () => {
+    setRegPatientType("student"); setRegTitle("นาย"); setRegFirstName(""); setRegLastName("");
+    setRegStudentId(""); setRegPhone(""); setRegFaculty(""); setRegDepartment("");
+    setRegBirthDate(""); setRegNationalId(""); setRegPosition(""); setRegError("");
   };
 
   const openRegForm = () => {
@@ -212,7 +226,7 @@ export default function NewVisitPage() {
             <input
               value={search}
               onChange={(e) => { setSearch(e.target.value); setSelected(null); setShowRegForm(false); }}
-              placeholder="ค้นหาชื่อ หรือ รหัสนักศึกษา..."
+              placeholder="ค้นหาชื่อ, รหัสนักศึกษา หรืออีเมล..."
               autoFocus
               className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
@@ -224,30 +238,40 @@ export default function NewVisitPage() {
           {/* Search results */}
           {results.length > 0 && (
             <div className="space-y-1.5">
-              {results.map((u) => (
-                <button
-                  key={u.id}
-                  onClick={() => selectPatient(u)}
-                  className={cn(
-                    "w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all",
-                    selected?.id === u.id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-100 hover:border-blue-200 hover:bg-gray-50"
-                  )}
-                >
-                  <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <User size={16} className="text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">
-                      {u.firstName} {u.lastName}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {u.studentId && `${u.studentId} · `}{u.email}
-                    </p>
-                  </div>
-                </button>
-              ))}
+              {results.map((u) => {
+                const roleBadge = u.role === "admin" || u.role === "staff"
+                  ? { label: "บุคลากร", color: "bg-purple-100 text-purple-700" }
+                  : { label: "นักศึกษา", color: "bg-blue-100 text-blue-700" };
+                return (
+                  <button
+                    key={u.id}
+                    onClick={() => selectPatient(u)}
+                    className={cn(
+                      "w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all",
+                      selected?.id === u.id
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-100 hover:border-blue-200 hover:bg-gray-50"
+                    )}
+                  >
+                    <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <User size={16} className="text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-800">
+                          {u.firstName} {u.lastName}
+                        </p>
+                        <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", roleBadge.color)}>
+                          {roleBadge.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400 truncate">
+                        {u.studentId && `${u.studentId} · `}{u.email}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -273,10 +297,37 @@ export default function NewVisitPage() {
                   <UserPlus size={14} />
                   ลงทะเบียนผู้ป่วยใหม่
                 </p>
-                <button onClick={() => { setShowRegForm(false); setRegError(""); setRegTitle("นาย"); setRegFirstName(""); setRegLastName(""); setRegStudentId(""); setRegPhone(""); setRegFaculty(""); setRegDepartment(""); setRegBirthDate(""); }}
+                <button onClick={() => { setShowRegForm(false); resetRegForm(); }}
                   className="text-blue-400 hover:text-blue-600">
                   <X size={15} />
                 </button>
+              </div>
+
+              {/* Patient type selector */}
+              <div>
+                <label className="text-xs text-blue-700 font-medium mb-1.5 block">ประเภทผู้ป่วย</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: "student" as const, label: "นักศึกษา", icon: <GraduationCap size={16} /> },
+                    { value: "staff_member" as const, label: "บุคลากร", icon: <Briefcase size={16} /> },
+                    { value: "external" as const, label: "บุคคลภายนอก", icon: <UserRound size={16} /> },
+                  ]).map(({ value, label, icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => { setRegPatientType(value); setRegStudentId(""); setRegNationalId(""); setRegPosition(""); }}
+                      className={cn(
+                        "flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 text-xs font-medium transition-all",
+                        regPatientType === value
+                          ? "border-blue-500 bg-white text-blue-700"
+                          : "border-blue-100 bg-white/50 text-gray-500 hover:border-blue-300"
+                      )}
+                    >
+                      {icon}
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Title + First name + Last name */}
@@ -313,56 +364,94 @@ export default function NewVisitPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs text-blue-700 font-medium mb-1 block">
-                  รหัสนักศึกษา * <span className="font-normal text-blue-500">(ใช้เป็นรหัสผ่านตั้งต้น)</span>
-                </label>
-                <input
-                  value={regStudentId}
-                  onChange={(e) => setRegStudentId(e.target.value)}
-                  placeholder="เช่น 6501012345"
-                  className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                />
-              </div>
+              {/* ── Student-specific: รหัสนักศึกษา ─────────────────────────────── */}
+              {regPatientType === "student" && (
+                <div>
+                  <label className="text-xs text-blue-700 font-medium mb-1 block">
+                    รหัสนักศึกษา * <span className="font-normal text-blue-500">(ใช้เป็นรหัสผ่านตั้งต้น)</span>
+                  </label>
+                  <input
+                    value={regStudentId}
+                    onChange={(e) => setRegStudentId(e.target.value)}
+                    placeholder="เช่น 6501012345"
+                    className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  />
+                </div>
+              )}
 
-              {/* Faculty */}
-              <div>
-                <label className="text-xs text-blue-700 font-medium mb-1 block">คณะ</label>
-                <select
-                  value={regFaculty}
-                  onChange={(e) => { setRegFaculty(e.target.value); setRegDepartment(""); }}
-                  className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                >
-                  <option value="">-- ไม่ระบุ --</option>
-                  <option>คณะวิศวกรรมศาสตร์</option>
-                  <option>คณะวิทยาศาสตร์และเทคโนโลยี</option>
-                  <option>คณะครุศาสตร์อุตสาหกรรมและเทคโนโลยี</option>
-                  <option>คณะสถาปัตยกรรมศาสตร์</option>
-                  <option>คณะบริหารธุรกิจ</option>
-                  <option>คณะเทคโนโลยีการจัดการ</option>
-                  <option>คณะเกษตรศาสตร์</option>
-                  <option>วิทยาลัยเทคโนโลยีอุตสาหกรรมและการจัดการ</option>
-                  <option>คณะวิศวกรรมศาสตร์และเทคโนโลยี (ตรัง)</option>
-                  <option>คณะวิทยาศาสตร์และเทคโนโลยีการประมง</option>
-                  <option>อื่นๆ</option>
-                </select>
-              </div>
+              {/* ── Staff-specific: ตำแหน่ง + รหัสพนักงาน ────────────────────── */}
+              {regPatientType === "staff_member" && (
+                <>
+                  <div>
+                    <label className="text-xs text-blue-700 font-medium mb-1 block">ตำแหน่ง</label>
+                    <input
+                      value={regPosition}
+                      onChange={(e) => setRegPosition(e.target.value)}
+                      placeholder="เช่น อาจารย์, แม่บ้าน, ช่างเทคนิค"
+                      className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-blue-700 font-medium mb-1 block">รหัสพนักงาน (ถ้ามี)</label>
+                    <input
+                      value={regStudentId}
+                      onChange={(e) => setRegStudentId(e.target.value)}
+                      placeholder="เช่น EMP-001"
+                      className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                    />
+                  </div>
+                </>
+              )}
 
-              {/* Department */}
-              <div>
-                <label className="text-xs text-blue-700 font-medium mb-1 block">สาขาวิชา</label>
-                <select
-                  value={regDepartment}
-                  onChange={(e) => setRegDepartment(e.target.value)}
-                  disabled={!regFaculty}
-                  className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">{regFaculty ? "-- เลือกสาขา --" : "-- เลือกคณะก่อน --"}</option>
-                  {(FACULTY_DEPARTMENTS[regFaculty] ?? []).map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-              </div>
+              {/* ── External-specific: เลขบัตร ปชช. ──────────────────────────── */}
+              {regPatientType === "external" && (
+                <div>
+                  <label className="text-xs text-blue-700 font-medium mb-1 block">เลขบัตรประชาชน (ถ้ามี)</label>
+                  <input
+                    value={regNationalId}
+                    onChange={(e) => setRegNationalId(e.target.value)}
+                    placeholder="x-xxxx-xxxxx-xx-x"
+                    maxLength={13}
+                    className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  />
+                </div>
+              )}
+
+              {/* Faculty — show for student & staff_member */}
+              {regPatientType !== "external" && (
+                <>
+                  <div>
+                    <label className="text-xs text-blue-700 font-medium mb-1 block">
+                      {regPatientType === "staff_member" ? "สังกัด/หน่วยงาน" : "คณะ"}
+                    </label>
+                    <select
+                      value={regFaculty}
+                      onChange={(e) => { setRegFaculty(e.target.value); setRegDepartment(""); }}
+                      className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                    >
+                      <option value="">-- ไม่ระบุ --</option>
+                      {Object.keys(FACULTY_DEPARTMENTS).map((f) => (
+                        <option key={f}>{f}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-blue-700 font-medium mb-1 block">สาขาวิชา</label>
+                    <select
+                      value={regDepartment}
+                      onChange={(e) => setRegDepartment(e.target.value)}
+                      disabled={!regFaculty}
+                      className="w-full px-3 py-2 border border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">{regFaculty ? "-- เลือกสาขา --" : "-- เลือกคณะก่อน --"}</option>
+                      {(FACULTY_DEPARTMENTS[regFaculty] ?? []).map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
 
               {/* Birth date + auto age */}
               <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
@@ -403,7 +492,7 @@ export default function NewVisitPage() {
 
               <button
                 onClick={handleRegister}
-                disabled={registering || !regFirstName.trim() || !regLastName.trim() || !regStudentId.trim()}
+                disabled={registering || !regFirstName.trim() || !regLastName.trim() || (regPatientType === "student" && !regStudentId.trim())}
                 className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5"
               >
                 {registering ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
@@ -411,7 +500,11 @@ export default function NewVisitPage() {
               </button>
 
               <p className="text-xs text-blue-600 text-center">
-                อีเมลจะถูกสร้างอัตโนมัติ · นักศึกษาสามารถเปลี่ยนรหัสผ่านได้ภายหลัง
+                {regPatientType === "student"
+                  ? "อีเมลจะถูกสร้างอัตโนมัติ · นักศึกษาสามารถเปลี่ยนรหัสผ่านได้ภายหลัง"
+                  : regPatientType === "staff_member"
+                  ? "จะสร้างบัญชีเจ้าหน้าที่ให้อัตโนมัติ"
+                  : "บุคคลภายนอกจะถูกบันทึกเป็นข้อมูลผู้ป่วยเท่านั้น ไม่สร้างบัญชี login"}
               </p>
             </div>
           )}

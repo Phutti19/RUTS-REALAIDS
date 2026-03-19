@@ -97,7 +97,7 @@ function ResetPasswordForm() {
             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-gray-500 mt-1">
           ต้องมีตัวพิมพ์ใหญ่ ตัวพิมพ์เล็ก และตัวเลขอย่างน้อยหนึ่งตัว
         </p>
       </div>
@@ -162,7 +162,7 @@ export default function ResetPasswordPage() {
         <div className="px-8 py-6">
           <Suspense
             fallback={
-              <div className="text-center text-sm text-gray-400 py-8">
+              <div className="text-center text-sm text-gray-500 py-8">
                 <Loader2 size={24} className="animate-spin mx-auto mb-2" />
                 กำลังโหลด...
               </div>

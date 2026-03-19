@@ -132,24 +132,24 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="portal-page h-screen overflow-hidden bg-gray-100 dark:bg-gray-950 flex">
+    <div className="portal-page h-screen overflow-hidden bg-slate-100 dark:bg-gray-950 flex">
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-blue-900 text-white flex flex-col sidebar-enter print:hidden",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-blue-950 dark:bg-blue-950 text-white flex flex-col sidebar-enter print:hidden",
           "transform transition-transform duration-200 ease-in-out",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
           "lg:translate-x-0 lg:static lg:flex"
         )}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center px-4 border-b border-blue-800">
+        <div className="h-16 flex items-center px-4 border-b border-blue-900">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-500/40">
+            <div className="w-9 h-9 bg-red-600 rounded-full flex items-center justify-center shadow-lg shadow-red-600/30">
               <Siren size={18} className="text-white" />
             </div>
             <div>
-              <p className="font-bold text-sm leading-tight">RUTS REALAIDS</p>
+              <p className="font-bold text-base leading-tight">RUTS REALAIDS</p>
               <p className="text-xs text-blue-300">{infirmaryName}</p>
             </div>
           </div>
@@ -165,13 +165,13 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                 href={href}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 text-sm transition-all duration-200 relative border-l-4",
+                  "flex items-center gap-3 px-4 py-3 text-[15px] transition-all duration-200 relative border-l-4",
                   isActive
-                    ? "bg-blue-800 text-white border-blue-300"
-                    : "text-blue-200 hover:bg-blue-800/60 hover:text-white border-transparent hover:translate-x-1"
+                    ? "bg-blue-900 text-white border-blue-400 font-medium"
+                    : "text-blue-200 hover:bg-blue-900/60 hover:text-white border-transparent hover:translate-x-1"
                 )}
               >
-                <Icon size={18} />
+                <Icon size={19} />
                 {label}
               </Link>
             );
@@ -179,18 +179,18 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         </nav>
 
         {/* User + Logout */}
-        <div className="p-4 border-t border-blue-800">
+        <div className="p-4 border-t border-blue-900">
           <div className="text-xs text-blue-300 mb-1">
             {user?.role === "admin" ? "ผู้ดูแลระบบ" : "เจ้าหน้าที่"}
           </div>
-          <div className="text-sm font-medium truncate">
+          <div className="text-sm font-semibold truncate">
             {user?.firstName} {user?.lastName}
           </div>
           <button
             onClick={handleLogout}
-            className="mt-3 w-full flex items-center gap-2 text-xs text-blue-300 hover:text-white hover:gap-3 transition-all duration-200"
+            className="mt-3 w-full flex items-center gap-2 text-sm text-blue-300 hover:text-white hover:gap-3 transition-all duration-200"
           >
-            <LogOut size={14} />
+            <LogOut size={15} />
             ออกจากระบบ
           </button>
         </div>
@@ -288,14 +288,14 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
               )}
             </div>
 
-            <div className="text-sm text-gray-700 dark:text-gray-200">
+            <div className="text-sm font-medium text-gray-700 dark:text-gray-200">
               {user?.firstName} {user?.lastName}
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="page-enter flex-1 overflow-auto p-4">{children}</main>
+        <main className="page-enter flex-1 overflow-auto p-5 lg:p-6">{children}</main>
       </div>
     </div>
   );

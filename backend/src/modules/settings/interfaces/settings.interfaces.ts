@@ -102,3 +102,69 @@ export interface EmergencyContact {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// ── Audit Logs ───────────────────────────────────────────────────────────────
+
+export interface AuditLogRow {
+  id: string;
+  user_id: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
+  created_at: Date;
+  user_name: string | null;
+}
+
+export interface AuditLog {
+  id: string;
+  userId: string | null;
+  userName: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  oldValues: Record<string, unknown> | null;
+  newValues: Record<string, unknown> | null;
+  createdAt: Date;
+}
+
+// ── Treatment Types ──────────────────────────────────────────────────────────
+
+export interface TreatmentTypeRow {
+  id: string;
+  name: string;
+  is_active: boolean;
+  created_at: Date;
+}
+
+export interface TreatmentType {
+  id: string;
+  name: string;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+// ── Login Attempts ───────────────────────────────────────────────────────────
+
+export interface LoginAttemptRow {
+  id: string;
+  user_id: string | null;
+  email: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  success: boolean;
+  failure_reason: string | null;
+  created_at: Date;
+}
+
+export interface LoginAttempt {
+  id: string;
+  userId: string | null;
+  email: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  success: boolean;
+  failureReason: string | null;
+  createdAt: Date;
+}

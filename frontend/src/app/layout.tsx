@@ -3,6 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ServiceWorkerRegister } from "@/components/shared/ServiceWorkerRegister";
+import { OfflineBanner } from "@/components/shared/OfflineBanner";
 
 export const metadata: Metadata = {
   title: "RUTS REALAIDS — ระบบแจ้งเหตุฉุกเฉินและห้องพยาบาล",
@@ -21,8 +22,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
   themeColor: "#1a56db",
 };
 
@@ -45,7 +46,8 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             <ServiceWorkerRegister />
-            {children}
+            <OfflineBanner />
+            <main>{children}</main>
           </AuthProvider>
         </ThemeProvider>
       </body>

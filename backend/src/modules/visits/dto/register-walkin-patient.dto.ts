@@ -5,14 +5,21 @@ import {
   IsEmail,
   IsInt,
   IsDateString,
+  IsIn,
   Matches,
   MaxLength,
   Min,
   Max,
+  ValidateIf,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class RegisterWalkInPatientDto {
+  /** Patient type: student, staff_member, or external */
+  @IsString()
+  @IsIn(['student', 'staff_member', 'external'])
+  patientType: 'student' | 'staff_member' | 'external';
+
   @IsString()
   @IsNotEmpty()
   @MaxLength(20)
@@ -32,20 +39,18 @@ export class RegisterWalkInPatientDto {
   lastName: string;
 
   /**
-   * Student ID — also used as the initial password.
-   * Accepts digits, letters, and hyphens (e.g. 6501012345 or 65-01012345).
+   * Student ID — required for students, optional for staff/external.
+   * Also used as the initial password for students.
    */
+  @ValidateIf((o) => o.patientType === 'student')
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'studentId is required for student patients' })
   @Matches(/^[A-Za-z0-9\-]{4,20}$/, {
     message: 'studentId must be 4–20 alphanumeric characters (hyphens allowed)',
   })
   @Transform(({ value }: { value: string }) => value?.trim())
-  studentId: string;
+  studentId?: string;
 
-  /**
-   * Optional email. If omitted, auto-generated as {studentId}@student.ruts.ac.th
-   */
   @IsOptional()
   @IsEmail({}, { message: 'Invalid email format' })
   @Transform(({ value }: { value: string }) => value?.toLowerCase().trim())
@@ -79,4 +84,18 @@ export class RegisterWalkInPatientDto {
   @IsOptional()
   @IsDateString({}, { message: 'birthDate must be a valid date string (YYYY-MM-DD)' })
   birthDate?: string | null;
+
+  /** National ID — useful for external visitors */
+  @IsOptional()
+  @IsString()
+  @MaxLength(13)
+  @Transform(({ value }: { value: string }) => value?.trim())
+  nationalId?: string;
+
+  /** Position/role description — useful for staff_member */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  @Transform(({ value }: { value: string }) => value?.trim() || null)
+  position?: string | null;
 }

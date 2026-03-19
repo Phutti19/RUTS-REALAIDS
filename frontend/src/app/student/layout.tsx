@@ -43,9 +43,9 @@ export default function StudentLayout({
   }
 
   return (
-    <div className="portal-page min-h-screen bg-gray-200 dark:bg-gray-950 pb-20">
+    <div className="portal-page min-h-screen bg-slate-200 dark:bg-gray-950 pb-20">
       {/* On tablet+: the content column appears as a centered card */}
-      <main className="page-enter max-w-md sm:max-w-xl md:max-w-2xl mx-auto bg-gray-50 dark:bg-gray-900 min-h-screen sm:shadow-2xl sm:shadow-black/10">
+      <main className="page-enter max-w-md sm:max-w-xl md:max-w-2xl mx-auto bg-slate-100 dark:bg-gray-900 min-h-screen sm:shadow-2xl sm:shadow-black/10">
         {children}
       </main>
 
@@ -59,26 +59,26 @@ export default function StudentLayout({
                 key={href}
                 href={href}
                 className={cn(
-                  "flex-1 flex flex-col items-center justify-center py-2 gap-1 text-xs transition-all duration-200 relative",
+                  "flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-sm transition-all duration-200 relative",
                   isActive
-                    ? "text-blue-600"
+                    ? "text-blue-700 dark:text-blue-400"
                     : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 )}
               >
                 {/* Active top indicator */}
                 {isActive && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-500 rounded-full" />
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full" />
                 )}
                 <Icon
-                  size={22}
+                  size={24}
                   className={cn(
                     "transition-transform duration-200",
                     isActive
-                      ? "stroke-blue-600 scale-110"
+                      ? "stroke-blue-700 dark:stroke-blue-400 scale-110"
                       : "stroke-gray-500 dark:stroke-gray-400"
                   )}
                 />
-                <span>{label}</span>
+                <span className="font-medium">{label}</span>
               </Link>
             );
           })}

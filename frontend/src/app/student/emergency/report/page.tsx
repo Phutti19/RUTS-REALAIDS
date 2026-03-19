@@ -143,30 +143,30 @@ export default function EmergencyReportPage() {
   const stepProgress = ((step - 1) / 2) * 100;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-100 dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-gradient-to-br from-red-600 via-red-600 to-rose-700 text-white px-4 pt-4 pb-5 sticky top-0 z-10 shadow-lg shadow-red-900/20">
+      <div className="bg-gradient-to-br from-red-700 via-red-800 to-rose-900 text-white px-5 pt-4 pb-5 sticky top-0 z-10 shadow-lg shadow-red-900/30">
         <div className="flex items-center gap-3 mb-4">
           <button
             onClick={() => router.back()}
             className="p-1.5 hover:bg-white/10 rounded-xl transition-colors active:scale-95"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={22} />
           </button>
-          <div className="flex-1 min-w-0 flex items-center gap-2">
-            <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center">
-              <Siren size={15} className="animate-pulse" />
+          <div className="flex-1 min-w-0 flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+              <Siren size={17} className="animate-pulse" />
             </div>
             <div>
-              <h1 className="font-bold text-base leading-tight">แจ้งเหตุฉุกเฉิน</h1>
-              <p className="text-red-200 text-[11px]">กรอกข้อมูลให้ครบก่อนส่ง</p>
+              <h1 className="font-bold text-lg leading-tight">แจ้งเหตุฉุกเฉิน</h1>
+              <p className="text-red-200 text-sm">กรอกข้อมูลให้ครบก่อนส่ง</p>
             </div>
           </div>
           <a
             href="tel:191"
-            className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors active:scale-95"
+            className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl px-3 py-2 text-sm font-semibold transition-colors active:scale-95"
           >
-            <Phone size={13} /> โทร 191
+            <Phone size={14} /> โทร 191
           </a>
         </div>
 
@@ -181,7 +181,7 @@ export default function EmergencyReportPage() {
                 )}>
                   {i + 1 < step ? "✓" : i + 1}
                 </div>
-                <span className={cn("text-[10px] hidden sm:block", i + 1 <= step ? "text-white" : "text-red-300")}>
+                <span className={cn("text-xs hidden sm:block", i + 1 <= step ? "text-white" : "text-red-300")}>
                   {label}
                 </span>
               </div>
@@ -216,16 +216,16 @@ export default function EmergencyReportPage() {
           </div>
           <div className="flex-1 min-w-0">
             {gps.loading ? (
-              <p className="text-sm text-blue-700 font-medium">กำลังดึงตำแหน่ง GPS...</p>
+              <p className="text-sm text-blue-800 font-medium">กำลังดึงตำแหน่ง GPS...</p>
             ) : gps.error ? (
               <>
-                <p className="text-sm text-amber-700 font-medium">{gps.error}</p>
-                <p className="text-xs text-amber-600">ปักหมุดตำแหน่งบนแผนที่ด้วยตนเอง</p>
+                <p className="text-sm text-amber-800 font-medium">{gps.error}</p>
+                <p className="text-sm text-amber-700">ปักหมุดตำแหน่งบนแผนที่ด้วยตนเอง</p>
               </>
             ) : (
               <>
-                <p className="text-sm text-emerald-700 font-medium">ดึง GPS สำเร็จ ✓</p>
-                <p className="text-xs text-emerald-600">ความแม่นยำ ±{gps.accuracy}ม. · ลากหมุดเพื่อปรับ</p>
+                <p className="text-sm text-emerald-800 font-medium">ดึง GPS สำเร็จ ✓</p>
+                <p className="text-sm text-emerald-700">ความแม่นยำ ±{gps.accuracy}ม. · ลากหมุดเพื่อปรับ</p>
               </>
             )}
           </div>
@@ -241,14 +241,14 @@ export default function EmergencyReportPage() {
         </div>
 
         {/* Map */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden" style={{ position: "relative", zIndex: 0 }}>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden" style={{ position: "relative", zIndex: 0 }}>
           <div className="flex items-center justify-between px-4 pt-3 pb-2">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center">
                 <MapPin size={14} className="text-red-500" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-800">ตำแหน่งเกิดเหตุ</p>
+                <p className="text-base font-semibold text-gray-800 dark:text-gray-100">ตำแหน่งเกิดเหตุ</p>
                 <p className="text-[11px] text-gray-400 font-mono">
                   {gps.loading ? "รอ GPS..." : `${pickedLat.toFixed(5)}, ${pickedLng.toFixed(5)}`}
                 </p>
@@ -272,8 +272,8 @@ export default function EmergencyReportPage() {
         </div>
 
         {/* Location name */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <label className="block text-sm font-semibold text-gray-800 mb-2">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <label className="block text-base font-semibold text-gray-800 dark:text-gray-100 mb-2">
             สถานที่ <span className="text-gray-400 font-normal text-xs">(ระบุเพิ่มเติม)</span>
           </label>
           <div className="relative">
@@ -290,10 +290,10 @@ export default function EmergencyReportPage() {
         </div>
 
         {/* Incident Type */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-6 h-6 bg-red-100 text-red-600 rounded-lg text-xs font-bold flex items-center justify-center">2</div>
-            <label className="text-sm font-semibold text-gray-800">
+            <label className="text-base font-semibold text-gray-800 dark:text-gray-100">
               ประเภทเหตุการณ์ <span className="text-red-500">*</span>
             </label>
           </div>
@@ -326,10 +326,10 @@ export default function EmergencyReportPage() {
         </div>
 
         {/* Severity */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-6 h-6 bg-red-100 text-red-600 rounded-lg text-xs font-bold flex items-center justify-center">3</div>
-            <label className="text-sm font-semibold text-gray-800">
+            <label className="text-base font-semibold text-gray-800 dark:text-gray-100">
               ความรุนแรง <span className="text-red-500">*</span>
             </label>
           </div>
@@ -372,10 +372,10 @@ export default function EmergencyReportPage() {
         </div>
 
         {/* Description */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-6 h-6 bg-red-100 text-red-600 rounded-lg text-xs font-bold flex items-center justify-center">4</div>
-            <label className="text-sm font-semibold text-gray-800">รายละเอียดเพิ่มเติม</label>
+            <label className="text-base font-semibold text-gray-800 dark:text-gray-100">รายละเอียดเพิ่มเติม</label>
           </div>
           <textarea
             value={description}
@@ -405,22 +405,22 @@ export default function EmergencyReportPage() {
         )}
 
         {/* Bottom actions */}
-        <div className="fixed bottom-[58px] left-0 right-0 bg-white/90 backdrop-blur-sm border-t border-gray-200">
+        <div className="fixed bottom-[58px] left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700">
           <div className="max-w-md mx-auto px-4 py-3">
             <button
               type="submit"
               disabled={!canSubmit}
               className={cn(
-                "w-full py-4 rounded-2xl font-bold text-base flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
+                "w-full py-4 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
                 canSubmit
-                  ? "bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white shadow-lg shadow-red-200"
-                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  ? "bg-gradient-to-r from-red-700 to-rose-700 hover:from-red-800 hover:to-rose-800 text-white shadow-lg shadow-red-300/40"
+                  : "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
               )}
             >
               {submitting ? (
-                <><Loader2 size={18} className="animate-spin" /> กำลังส่ง...</>
+                <><Loader2 size={20} className="animate-spin" /> กำลังส่ง...</>
               ) : (
-                <><Siren size={18} /> ส่งแจ้งเหตุ</>
+                <><Siren size={20} /> ส่งแจ้งเหตุ</>
               )}
             </button>
           </div>

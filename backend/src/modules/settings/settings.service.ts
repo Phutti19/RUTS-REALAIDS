@@ -19,6 +19,9 @@ import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 import { CreateEmergencyContactDto } from './dto/create-emergency-contact.dto';
 import { UpdateEmergencyContactDto } from './dto/update-emergency-contact.dto';
+import { ListAuditLogsDto } from './dto/list-audit-logs.dto';
+import { CreateTreatmentTypeDto } from './dto/create-treatment-type.dto';
+import { ListLoginAttemptsDto } from './dto/list-login-attempts.dto';
 import {
   SystemSetting,
   SettingRow,
@@ -29,6 +32,12 @@ import {
   DataBackupRow,
   EmergencyContact,
   EmergencyContactRow,
+  AuditLog,
+  AuditLogRow,
+  TreatmentType,
+  TreatmentTypeRow,
+  LoginAttempt,
+  LoginAttemptRow,
 } from './interfaces/settings.interfaces';
 
 const BCRYPT_ROUNDS = 12;
@@ -93,6 +102,42 @@ function formatContact(row: EmergencyContactRow): EmergencyContact {
     note: row.note,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function formatAuditLog(row: AuditLogRow): AuditLog {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    userName: row.user_name,
+    action: row.action,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    oldValues: row.old_values,
+    newValues: row.new_values,
+    createdAt: row.created_at,
+  };
+}
+
+function formatTreatmentType(row: TreatmentTypeRow): TreatmentType {
+  return {
+    id: row.id,
+    name: row.name,
+    isActive: row.is_active,
+    createdAt: row.created_at,
+  };
+}
+
+function formatLoginAttempt(row: LoginAttemptRow): LoginAttempt {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    email: row.email,
+    ipAddress: row.ip_address,
+    userAgent: row.user_agent,
+    success: row.success,
+    failureReason: row.failure_reason,
+    createdAt: row.created_at,
   };
 }
 
@@ -486,5 +531,172 @@ export class SettingsService {
       [id],
     );
     if (count === 0) throw new NotFoundException('Emergency contact not found');
+  }
+
+  // ── Audit Logs ────────────────────────────────────────────────────────────
+
+  async listAuditLogs(dto: ListAuditLogsDto): Promise<PaginatedResult<AuditLog>> {
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    if (dto.action) {
+      conditions.push(`a.action = $${idx++}`);
+      values.push(dto.action);
+    }
+    if (dto.entityType) {
+      conditions.push(`a.entity_type = $${idx++}`);
+      values.push(dto.entityType);
+    }
+    if (dto.search) {
+      conditions.push(
+        `(CONCAT(u.first_name, ' ', u.last_name) ILIKE $${idx} OR a.entity_type ILIKE $${idx} OR a.entity_id ILIKE $${idx})`,
+      );
+      values.push(`%${dto.search}%`);
+      idx++;
+    }
+    if (dto.from) {
+      conditions.push(`a.created_at >= $${idx++}::timestamptz`);
+      values.push(dto.from);
+    }
+    if (dto.to) {
+      conditions.push(`a.created_at <= $${idx++}::timestamptz`);
+      values.push(dto.to);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countSql = `SELECT COUNT(*) FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id ${where}`;
+    const dataSql = `SELECT a.id, a.user_id, a.action, a.entity_type, a.entity_id,
+                            a.old_values, a.new_values, a.created_at,
+                            CONCAT(u.first_name, ' ', u.last_name) AS user_name
+                     FROM audit_logs a
+                     LEFT JOIN users u ON u.id = a.user_id
+                     ${where}
+                     ORDER BY a.created_at DESC`;
+
+    const result = await this.db.queryPaginated<AuditLogRow>(
+      countSql,
+      dataSql,
+      values,
+      { page: dto.page, limit: dto.limit },
+    );
+
+    return { ...result, data: result.data.map(formatAuditLog) };
+  }
+
+  // ── Treatment Types ───────────────────────────────────────────────────────
+
+  async listTreatmentTypes(): Promise<TreatmentType[]> {
+    const rows = await this.db.queryMany<TreatmentTypeRow>(
+      `SELECT id, name, is_active, created_at FROM treatment_types ORDER BY name ASC`,
+    );
+    return rows.map(formatTreatmentType);
+  }
+
+  async createTreatmentType(dto: CreateTreatmentTypeDto): Promise<TreatmentType> {
+    const existing = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM treatment_types WHERE LOWER(name) = LOWER($1)`,
+      [dto.name],
+    );
+    if (existing) throw new ConflictException('Treatment type name already exists');
+
+    const row = await this.db.queryOne<TreatmentTypeRow>(
+      `INSERT INTO treatment_types (id, name)
+       VALUES ($1, $2)
+       RETURNING id, name, is_active, created_at`,
+      [randomUUID(), dto.name],
+    );
+    return formatTreatmentType(row!);
+  }
+
+  async toggleTreatmentType(id: string): Promise<TreatmentType> {
+    const row = await this.db.queryOne<TreatmentTypeRow>(
+      `UPDATE treatment_types
+       SET is_active = NOT is_active
+       WHERE id = $1
+       RETURNING id, name, is_active, created_at`,
+      [id],
+    );
+    if (!row) throw new NotFoundException('Treatment type not found');
+    return formatTreatmentType(row);
+  }
+
+  // ── Login Attempts ────────────────────────────────────────────────────────
+
+  async listLoginAttempts(dto: ListLoginAttemptsDto): Promise<PaginatedResult<LoginAttempt>> {
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    if (dto.email) {
+      conditions.push(`email ILIKE $${idx++}`);
+      values.push(`%${dto.email}%`);
+    }
+    if (dto.success !== undefined) {
+      conditions.push(`success = $${idx++}`);
+      values.push(dto.success);
+    }
+    if (dto.from) {
+      conditions.push(`created_at >= $${idx++}::timestamptz`);
+      values.push(dto.from);
+    }
+    if (dto.to) {
+      conditions.push(`created_at <= $${idx++}::timestamptz`);
+      values.push(dto.to);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countSql = `SELECT COUNT(*) FROM login_attempts ${where}`;
+    const dataSql = `SELECT id, user_id, email, ip_address::text, user_agent, success, failure_reason, created_at
+                     FROM login_attempts ${where}
+                     ORDER BY created_at DESC`;
+
+    const result = await this.db.queryPaginated<LoginAttemptRow>(
+      countSql,
+      dataSql,
+      values,
+      { page: dto.page, limit: dto.limit },
+    );
+
+    return { ...result, data: result.data.map(formatLoginAttempt) };
+  }
+
+  async getLoginAttemptStats(): Promise<{
+    totalToday: number;
+    failedToday: number;
+    lockedAccounts: number;
+    topFailedEmails: { email: string; count: number }[];
+  }> {
+    const [todayRow, failedRow, lockedRow] = await Promise.all([
+      this.db.queryOne<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM login_attempts WHERE created_at >= CURRENT_DATE`,
+      ),
+      this.db.queryOne<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM login_attempts WHERE created_at >= CURRENT_DATE AND success = false`,
+      ),
+      this.db.queryOne<{ count: string }>(
+        `SELECT COUNT(DISTINCT email)::text AS count FROM login_attempts
+         WHERE success = false AND created_at > NOW() - INTERVAL '15 minutes'
+         GROUP BY email HAVING COUNT(*) >= 5`,
+      ),
+    ]);
+
+    const topFailed = await this.db.queryMany<{ email: string; count: string }>(
+      `SELECT email, COUNT(*)::text AS count
+       FROM login_attempts
+       WHERE success = false AND created_at >= CURRENT_DATE
+       GROUP BY email
+       ORDER BY COUNT(*) DESC
+       LIMIT 10`,
+    );
+
+    return {
+      totalToday: parseInt(todayRow?.count ?? '0', 10),
+      failedToday: parseInt(failedRow?.count ?? '0', 10),
+      lockedAccounts: parseInt(lockedRow?.count ?? '0', 10),
+      topFailedEmails: topFailed.map((r) => ({ email: r.email, count: parseInt(r.count, 10) })),
+    };
   }
 }

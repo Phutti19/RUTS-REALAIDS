@@ -3,7 +3,9 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
+import * as webpush from 'web-push';
 
 import { DatabaseService, PaginatedResult } from '../../database/db.service';
 import { WsService, WS_EVENTS } from '../../websocket/ws.service';
@@ -19,13 +21,28 @@ import {
 } from './interfaces/notifications.interfaces';
 
 @Injectable()
-export class NotificationsService {
+export class NotificationsService implements OnModuleInit {
   private readonly logger = new Logger(NotificationsService.name);
+  private pushEnabled = false;
 
   constructor(
     private readonly db: DatabaseService,
     private readonly ws: WsService,
   ) {}
+
+  onModuleInit() {
+    const subject = process.env.VAPID_SUBJECT;
+    const publicKey = process.env.VAPID_PUBLIC_KEY;
+    const privateKey = process.env.VAPID_PRIVATE_KEY;
+
+    if (subject && publicKey && privateKey) {
+      webpush.setVapidDetails(subject, publicKey, privateKey);
+      this.pushEnabled = true;
+      this.logger.log('Web Push configured with VAPID keys');
+    } else {
+      this.logger.warn('VAPID keys not set — Web Push disabled');
+    }
+  }
 
   // ── Public API — called by other modules ──────────────────────────────────────
 
@@ -53,6 +70,14 @@ export class NotificationsService {
 
     // Send real-time event to the target user
     this.ws.notifyUser(input.userId, notification);
+
+    // Send Web Push notification
+    this.sendPushToUser(input.userId, {
+      title: input.title,
+      message: input.message,
+      tag: `${input.type}-${row!.id}`,
+      url: this.buildNotificationUrl(input.type, input.referenceType, input.referenceId),
+    });
 
     return notification;
   }
@@ -83,6 +108,14 @@ export class NotificationsService {
       message,
       referenceType: referenceType ?? null,
       referenceId: referenceId ?? null,
+    });
+
+    // Send Web Push to all staff
+    this.sendPushToStaff({
+      title,
+      message,
+      tag: `staff-${type}`,
+      url: this.buildNotificationUrl(type, referenceType, referenceId),
     });
 
     this.logger.log(`Broadcast notification to all staff: type=${type} title="${title}"`);
@@ -209,6 +242,94 @@ export class NotificationsService {
 
     this.logger.log(`Push subscription removed: user=${userId} count=${count}`);
     return { removed: count };
+  }
+
+  // ── Web Push delivery ────────────────────────────────────────────────────────
+
+  private async sendPushToUser(
+    userId: string,
+    payload: { title: string; message: string; tag?: string; url?: string },
+  ): Promise<void> {
+    if (!this.pushEnabled) return;
+
+    const subs = await this.db.queryMany<PushSubscriptionRow>(
+      `SELECT * FROM push_subscriptions WHERE user_id = $1`,
+      [userId],
+    );
+    if (!subs.length) return;
+
+    await this.deliverPush(subs, payload);
+  }
+
+  private async sendPushToStaff(
+    payload: { title: string; message: string; tag?: string; url?: string },
+  ): Promise<void> {
+    if (!this.pushEnabled) return;
+
+    const subs = await this.db.queryMany<PushSubscriptionRow>(
+      `SELECT ps.* FROM push_subscriptions ps
+       JOIN users u ON u.id = ps.user_id
+       WHERE u.role IN ('staff', 'admin') AND u.is_active = true`,
+      [],
+    );
+    if (!subs.length) return;
+
+    await this.deliverPush(subs, payload);
+  }
+
+  private async deliverPush(
+    subscriptions: PushSubscriptionRow[],
+    payload: { title: string; message: string; tag?: string; url?: string },
+  ): Promise<void> {
+    const body = JSON.stringify(payload);
+
+    const results = await Promise.allSettled(
+      subscriptions.map((sub) =>
+        webpush.sendNotification(
+          {
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.p256dh_key, auth: sub.auth_key },
+          },
+          body,
+        ),
+      ),
+    );
+
+    // Clean up expired/invalid subscriptions (410 Gone or 404)
+    const staleEndpoints: string[] = [];
+    results.forEach((result, i) => {
+      if (result.status === 'rejected') {
+        const statusCode = (result.reason as { statusCode?: number })?.statusCode;
+        if (statusCode === 404 || statusCode === 410) {
+          staleEndpoints.push(subscriptions[i].endpoint);
+        } else {
+          this.logger.warn(
+            `Push failed for endpoint ${subscriptions[i].endpoint}: ${result.reason}`,
+          );
+        }
+      }
+    });
+
+    if (staleEndpoints.length) {
+      await this.db.execute(
+        `DELETE FROM push_subscriptions WHERE endpoint = ANY($1::text[])`,
+        [staleEndpoints],
+      );
+      this.logger.log(`Removed ${staleEndpoints.length} stale push subscription(s)`);
+    }
+  }
+
+  private buildNotificationUrl(
+    type?: string | null,
+    referenceType?: string | null,
+    referenceId?: string | null,
+  ): string {
+    if (referenceType === 'incident' && referenceId) return `/staff/emergency`;
+    if (referenceType === 'appointment' && referenceId) return `/staff/appointments`;
+    if (referenceType === 'visit' && referenceId) return `/staff/patients/${referenceId}`;
+    if (referenceType === 'medicine' && referenceId) return `/staff/medicines/${referenceId}`;
+    if (type === 'stock_alert' || type === 'expiry_alert') return `/staff/medicines`;
+    return '/';
   }
 
   // ── Formatters ────────────────────────────────────────────────────────────────

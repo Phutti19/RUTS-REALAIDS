@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://realaids.rmutsv.ac.th/sitemap.xml

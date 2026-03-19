@@ -3,23 +3,24 @@
 import { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft,
-  Package,
-  Plus,
-  Loader2,
-  AlertTriangle,
-  CheckCircle2,
-  AlertCircle,
-  TrendingUp,
-  TrendingDown,
-  ChevronDown,
-  ChevronUp,
-  Trash2,
+  ArrowLeft, Package, Plus, Loader2, AlertTriangle,
+  CheckCircle2, AlertCircle, TrendingUp, TrendingDown,
+  ChevronDown, ChevronUp, Trash2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import type { Medicine, MedicineBatch, MedicineStockLog } from "@/types";
+
+const CATEGORY_TH: Record<string, string> = { medicine: "ยา", supply: "วัสดุ", equipment: "อุปกรณ์" };
+const CATEGORY_ICON: Record<string, string> = { medicine: "💊", supply: "🩹", equipment: "🔧" };
+
+const ACTION_META: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
+  received: { label: "รับเข้า",  icon: <TrendingUp size={15} />,   color: "text-emerald-600", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
+  dispensed:{ label: "จ่ายออก", icon: <TrendingDown size={15} />, color: "text-red-500",     bg: "bg-red-100 dark:bg-red-900/30" },
+  expired:  { label: "หมดอายุ", icon: <AlertTriangle size={15} />,color: "text-orange-500",  bg: "bg-orange-100 dark:bg-orange-900/30" },
+  adjusted: { label: "ปรับ",    icon: <Package size={15} />,      color: "text-blue-500",    bg: "bg-blue-100 dark:bg-blue-900/30" },
+};
 
 export default function MedicineDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -29,7 +30,6 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
   const [logs, setLogs] = useState<MedicineStockLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Add batch form
   const [showBatchForm, setShowBatchForm] = useState(false);
   const [batchNumber, setBatchNumber] = useState("");
   const [batchQty, setBatchQty] = useState(1);
@@ -38,24 +38,10 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
   const [addingBatch, setAddingBatch] = useState(false);
   const [batchMsg, setBatchMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  // Delete
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
-  const handleDelete = async () => {
-    setDeleting(true);
-    setDeleteError("");
-    const res = await api.delete(`/medicines/${id}`);
-    setDeleting(false);
-    if (res.success) {
-      router.push("/staff/medicines");
-    } else {
-      setDeleteError(res.message ?? "ไม่สามารถลบได้");
-    }
-  };
-
-  // Adjust stock form
   const [showAdjustForm, setShowAdjustForm] = useState(false);
   const [adjustQty, setAdjustQty] = useState<number>(0);
   const [adjustBatchId, setAdjustBatchId] = useState<string>("");
@@ -70,35 +56,31 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
       api.get<{ data: MedicineStockLog[] }>(`/medicines/${id}/stock-logs?limit=30`),
     ]);
     if (medRes.success && medRes.data) setMedicine(medRes.data);
-    if (batchRes.success) {
-      setBatches(Array.isArray(batchRes.data) ? (batchRes.data as unknown as MedicineBatch[]) : []);
-    }
-    if (logRes.success) {
-      setLogs(Array.isArray(logRes.data) ? (logRes.data as unknown as MedicineStockLog[]) : []);
-    }
+    if (batchRes.success) setBatches(Array.isArray(batchRes.data) ? (batchRes.data as unknown as MedicineBatch[]) : []);
+    if (logRes.success) setLogs(Array.isArray(logRes.data) ? (logRes.data as unknown as MedicineStockLog[]) : []);
     setLoading(false);
   }, [id]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  const handleDelete = async () => {
+    setDeleting(true); setDeleteError("");
+    const res = await api.delete(`/medicines/${id}`);
+    setDeleting(false);
+    if (res.success) router.push("/staff/medicines");
+    else setDeleteError(res.message ?? "ไม่สามารถลบได้");
+  };
+
   const addBatch = async () => {
-    setAddingBatch(true);
-    setBatchMsg(null);
+    setAddingBatch(true); setBatchMsg(null);
     const res = await api.post(`/medicines/${id}/batches`, {
-      batchNumber,
-      quantity: batchQty,
-      expiryDate,
-      notes: batchNote.trim() || null,
+      batchNumber, quantity: batchQty, expiryDate, notes: batchNote.trim() || null,
     });
     setAddingBatch(false);
     if (res.success) {
       setBatchMsg({ type: "ok", text: "เพิ่ม batch สำเร็จ" });
-      setBatchNumber("");
-      setBatchQty(1);
-      setExpiryDate("");
-      setBatchNote("");
-      setShowBatchForm(false);
-      loadData();
+      setBatchNumber(""); setBatchQty(1); setExpiryDate(""); setBatchNote("");
+      setShowBatchForm(false); loadData();
     } else {
       setBatchMsg({ type: "err", text: res.message ?? "เกิดข้อผิดพลาด" });
     }
@@ -106,120 +88,97 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
 
   const adjustStock = async () => {
     if (adjustQty === 0) return;
-    setAdjusting(true);
-    setAdjustMsg(null);
+    setAdjusting(true); setAdjustMsg(null);
     const res = await api.post(`/medicines/${id}/adjust`, {
-      quantityChange: adjustQty,
-      batchId: adjustBatchId || undefined,
+      quantityChange: adjustQty, batchId: adjustBatchId || undefined,
       note: adjustNote.trim() || null,
     });
     setAdjusting(false);
     if (res.success) {
       setAdjustMsg({ type: "ok", text: "ปรับ stock สำเร็จ" });
-      setAdjustQty(0);
-      setAdjustBatchId("");
-      setAdjustNote("");
-      setShowAdjustForm(false);
-      loadData();
+      setAdjustQty(0); setAdjustBatchId(""); setAdjustNote("");
+      setShowAdjustForm(false); loadData();
     } else {
       setAdjustMsg({ type: "err", text: res.message ?? "เกิดข้อผิดพลาด" });
     }
   };
 
-  const ACTION_LABEL: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-    received: { label: "รับเข้า", icon: <TrendingUp size={14} />, color: "text-green-600" },
-    dispensed: { label: "จ่ายออก", icon: <TrendingDown size={14} />, color: "text-red-500" },
-    expired: { label: "หมดอายุ", icon: <AlertTriangle size={14} />, color: "text-orange-500" },
-    adjusted: { label: "ปรับ", icon: <Package size={14} />, color: "text-blue-500" },
-  };
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 size={28} className="animate-spin text-gray-300" />
+    </div>
+  );
 
-  const CATEGORY_TH: Record<string, string> = {
-    medicine: "ยา", supply: "วัสดุ", equipment: "อุปกรณ์",
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 size={28} className="animate-spin text-gray-300" />
-      </div>
-    );
-  }
-
-  if (!medicine) {
-    return (
-      <div className="text-center py-16">
-        <p className="text-gray-500">ไม่พบข้อมูล</p>
-        <Link href="/staff/medicines" className="text-blue-600 text-sm hover:underline mt-2 block">กลับ</Link>
-      </div>
-    );
-  }
+  if (!medicine) return (
+    <div className="text-center py-16">
+      <p className="text-gray-500">ไม่พบข้อมูล</p>
+      <Link href="/staff/medicines" className="text-blue-600 text-sm hover:underline mt-2 block">กลับ</Link>
+    </div>
+  );
 
   const today = new Date().toISOString().split("T")[0];
   const thirtyDaysLater = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
+  const batchTotal = batches.filter((b) => new Date(b.expiryDate) > new Date()).reduce((s, b) => s + b.quantity, 0);
+  const mismatch = batches.length > 0 && batchTotal !== medicine.stockQuantity;
+  const stockPct = Math.min(100, (medicine.stockQuantity / Math.max(medicine.minStockLevel * 3, 1)) * 100);
 
   return (
-    <div className="space-y-5 max-w-4xl mx-auto">
-      {/* Header */}
+    <div className="space-y-6 max-w-4xl mx-auto">
+
+      {/* ── Header ─────────────────────────────────────────── */}
       <div className="flex items-center gap-3">
-        <Link href="/staff/medicines" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-          <ArrowLeft size={18} />
+        <Link href="/staff/medicines" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors">
+          <ArrowLeft size={22} />
         </Link>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold text-gray-900">{medicine.name}</h1>
-          <p className="text-sm text-gray-500">
+        <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">
+          {CATEGORY_ICON[medicine.category] ?? "💊"}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white truncate">{medicine.name}</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {medicine.genericName && `${medicine.genericName} · `}
             {CATEGORY_TH[medicine.category] ?? medicine.category}
           </p>
         </div>
         {medicine.isLowStock && (
-          <span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-full font-medium">
-            <AlertTriangle size={13} /> สต๊อกต่ำ
+          <span className="flex items-center gap-1.5 text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-3 py-1.5 rounded-full font-semibold">
+            <AlertTriangle size={14} /> สต๊อกต่ำ
           </span>
         )}
-        <button
-          onClick={() => { setShowDeleteConfirm(true); setDeleteError(""); }}
-          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-          title="ลบรายการนี้"
-        >
-          <Trash2 size={18} />
+        <button onClick={() => { setShowDeleteConfirm(true); setDeleteError(""); }}
+          className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-colors">
+          <Trash2 size={20} />
         </button>
       </div>
 
-      {/* Delete confirm dialog */}
+      {/* ── Delete confirm dialog ──────────────────────────── */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Trash2 size={20} className="text-red-600" />
+              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Trash2 size={22} className="text-red-600 dark:text-red-400" />
               </div>
               <div>
-                <p className="font-semibold text-gray-900">ลบ "{medicine.name}"?</p>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="font-bold text-gray-900 dark:text-white text-base">ลบ &ldquo;{medicine.name}&rdquo;?</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   หากยานี้เคยถูกใช้ในบันทึกผู้ป่วยจะไม่สามารถลบได้
                 </p>
               </div>
             </div>
             {deleteError && (
-              <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 rounded-xl px-3 py-2.5">
-                <AlertCircle size={15} className="flex-shrink-0" />
-                {deleteError}
+              <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/20 rounded-xl px-4 py-3">
+                <AlertCircle size={16} className="flex-shrink-0" /> {deleteError}
               </div>
             )}
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => { setShowDeleteConfirm(false); setDeleteError(""); }}
-                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-              >
+            <div className="flex gap-2">
+              <button onClick={() => { setShowDeleteConfirm(false); setDeleteError(""); }}
+                className="flex-1 py-3 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                 ยกเลิก
               </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors"
-              >
-                {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
-                ลบ
+              <button onClick={handleDelete} disabled={deleting}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors">
+                {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />} ลบ
               </button>
             </div>
           </div>
@@ -227,168 +186,99 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Stock overview */}
+
+        {/* ── Left column ────────────────────────────────── */}
         <div className="space-y-4">
-          {(() => {
-            const batchTotal = batches.filter((b) => new Date(b.expiryDate) > new Date()).reduce((s, b) => s + b.quantity, 0);
-            const mismatch = batches.length > 0 && batchTotal !== medicine.stockQuantity;
-            return (
-              <>
-                <div className="bg-white rounded-2xl shadow-sm p-5">
-                  <p className="text-xs text-gray-400 mb-1">คงเหลือในระบบ</p>
-                  <p className={cn("text-4xl font-bold", medicine.isLowStock ? "text-red-600" : "text-gray-900")}>
-                    {medicine.stockQuantity}
-                  </p>
-                  <p className="text-sm text-gray-500">{medicine.unit}</p>
 
-                  {/* Batch total comparison */}
-                  {batches.length > 0 && (
-                    <div className={cn(
-                      "mt-3 pt-3 border-t flex items-center justify-between",
-                      mismatch ? "border-amber-100" : "border-gray-100"
-                    )}>
-                      <div>
-                        <p className="text-xs text-gray-400">รวมจาก Batch (ไม่หมดอายุ)</p>
-                        <p className={cn("text-sm font-semibold", mismatch ? "text-amber-600" : "text-gray-700")}>
-                          {batchTotal} {medicine.unit}
-                        </p>
-                      </div>
-                      {mismatch ? (
-                        <span className="flex items-center gap-1 text-[11px] bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-medium">
-                          <AlertCircle size={11} /> ไม่ตรง
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-[11px] bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                          <CheckCircle2 size={11} /> ตรงกัน
-                        </span>
-                      )}
-                    </div>
-                  )}
+          {/* Stock overview */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-5 border border-gray-100 dark:border-gray-700">
+            <p className="text-sm text-gray-400 dark:text-gray-500 font-medium mb-1">คงเหลือในระบบ</p>
+            <div className="flex items-end gap-2">
+              <p className={cn("text-5xl font-black leading-none", medicine.isLowStock ? "text-red-600" : "text-gray-900 dark:text-white")}>
+                {medicine.stockQuantity.toLocaleString()}
+              </p>
+              <p className="text-lg text-gray-400 dark:text-gray-500 mb-1">{medicine.unit}</p>
+            </div>
 
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <p className="text-xs text-gray-400">
-                      เกณฑ์ขั้นต่ำ:{" "}
-                      <span className={cn("font-medium", medicine.isLowStock ? "text-red-600" : "text-gray-600")}>
-                        {medicine.minStockLevel} {medicine.unit}
-                      </span>
+            {/* Progress bar */}
+            <div className="mt-4">
+              <div className="flex justify-between text-xs text-gray-400 mb-1.5">
+                <span>ระดับสต๊อก</span>
+                <span>{Math.round(stockPct)}%</span>
+              </div>
+              <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className={cn("h-full rounded-full transition-all",
+                  medicine.isLowStock ? "bg-red-500" : stockPct < 60 ? "bg-amber-400" : "bg-emerald-500"
+                )} style={{ width: `${stockPct}%` }} />
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-400 dark:text-gray-500">เกณฑ์ขั้นต่ำ</p>
+                <p className={cn("text-lg font-bold", medicine.isLowStock ? "text-red-600" : "text-gray-600 dark:text-gray-300")}>
+                  {medicine.minStockLevel} {medicine.unit}
+                </p>
+              </div>
+              {batches.length > 0 && (
+                <div className="text-right">
+                  <p className="text-xs text-gray-400 dark:text-gray-500">รวมจาก Batch</p>
+                  <div className="flex items-center gap-1.5 justify-end mt-0.5">
+                    <p className={cn("text-base font-bold", mismatch ? "text-amber-600" : "text-gray-600 dark:text-gray-300")}>
+                      {batchTotal} {medicine.unit}
                     </p>
+                    {mismatch ? (
+                      <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-semibold">ไม่ตรง</span>
+                    ) : (
+                      <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full font-semibold">ตรงกัน</span>
+                    )}
                   </div>
                 </div>
-
-                {/* Stock progress bar */}
-                <div className="bg-white rounded-2xl shadow-sm p-4">
-                  <div className="flex justify-between text-xs text-gray-500 mb-2">
-                    <span>สต๊อกในระบบ</span>
-                    <span>{Math.round((medicine.stockQuantity / Math.max(medicine.minStockLevel * 3, 1)) * 100)}%</span>
-                  </div>
-                  <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={cn("h-full rounded-full transition-all",
-                        medicine.isLowStock ? "bg-red-500" : "bg-green-500"
-                      )}
-                      style={{
-                        width: `${Math.min(100, (medicine.stockQuantity / Math.max(medicine.minStockLevel * 3, 1)) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                  {batches.length > 0 && (
-                    <>
-                      <div className="flex justify-between text-xs text-gray-500 mt-3 mb-1.5">
-                        <span>รวม Batch จริง</span>
-                        <span>{Math.round((batchTotal / Math.max(medicine.minStockLevel * 3, 1)) * 100)}%</span>
-                      </div>
-                      <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className={cn("h-full rounded-full transition-all", mismatch ? "bg-amber-400" : "bg-blue-400")}
-                          style={{
-                            width: `${Math.min(100, (batchTotal / Math.max(medicine.minStockLevel * 3, 1)) * 100)}%`,
-                          }}
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-              </>
-            );
-          })()}
+              )}
+            </div>
+          </div>
 
           {/* Action buttons */}
-          <div className="space-y-2">
-            <button
-              onClick={() => { setShowBatchForm(!showBatchForm); setShowAdjustForm(false); }}
-              className="w-full flex items-center justify-between px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors"
-            >
-              <span className="flex items-center gap-2"><Plus size={16} /> รับยาเข้า (Batch)</span>
-              {showBatchForm ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          <div className="space-y-2.5">
+            <button onClick={() => { setShowBatchForm(!showBatchForm); setShowAdjustForm(false); }}
+              className="w-full flex items-center justify-between px-4 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-base font-bold transition-colors shadow-sm">
+              <span className="flex items-center gap-2"><Plus size={18} /> รับยาเข้า (Batch)</span>
+              {showBatchForm ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
             </button>
-
-            <button
-              onClick={() => { setShowAdjustForm(!showAdjustForm); setShowBatchForm(false); }}
-              className="w-full flex items-center justify-between px-4 py-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-sm font-semibold transition-colors"
-            >
-              <span className="flex items-center gap-2"><Package size={16} /> ปรับ stock</span>
-              {showAdjustForm ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            <button onClick={() => { setShowAdjustForm(!showAdjustForm); setShowBatchForm(false); }}
+              className="w-full flex items-center justify-between px-4 py-3.5 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 text-gray-700 dark:text-gray-200 rounded-xl text-base font-bold transition-colors">
+              <span className="flex items-center gap-2"><Package size={18} /> ปรับ stock</span>
+              {showAdjustForm ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
             </button>
           </div>
 
           {/* Add batch form */}
           {showBatchForm && (
-            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-3">
-              <h3 className="text-sm font-semibold text-blue-800">รับยาเข้า Batch ใหม่</h3>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">เลข Batch *</label>
-                <input
-                  value={batchNumber}
-                  onChange={(e) => setBatchNumber(e.target.value)}
+            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-5 space-y-4">
+              <h3 className="text-base font-bold text-blue-800 dark:text-blue-300">รับยาเข้า Batch ใหม่</h3>
+              <Field label="เลข Batch *">
+                <input value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)}
                   placeholder="เช่น LOT-2026-001"
-                  className="w-full px-3 py-2 border border-gray-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
+                  className="w-full px-3.5 py-2.5 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="จำนวน *">
+                  <input type="number" min={1} value={batchQty} onChange={(e) => setBatchQty(parseInt(e.target.value) || 1)}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                </Field>
+                <Field label="วันหมดอายุ *">
+                  <input type="date" value={expiryDate} min={today} onChange={(e) => setExpiryDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                </Field>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">จำนวน *</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={batchQty}
-                    onChange={(e) => setBatchQty(parseInt(e.target.value) || 1)}
-                    className="w-full px-3 py-2 border border-gray-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">วันหมดอายุ *</label>
-                  <input
-                    type="date"
-                    value={expiryDate}
-                    min={today}
-                    onChange={(e) => setExpiryDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">หมายเหตุ</label>
-                <input
-                  value={batchNote}
-                  onChange={(e) => setBatchNote(e.target.value)}
-                  placeholder="หมายเหตุ..."
-                  className="w-full px-3 py-2 border border-gray-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-              </div>
-              {batchMsg && (
-                <div className={cn("flex items-center gap-1.5 text-xs rounded-xl px-3 py-2",
-                  batchMsg.type === "ok" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-                )}>
-                  {batchMsg.type === "ok" ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
-                  {batchMsg.text}
-                </div>
-              )}
-              <button
-                onClick={addBatch}
-                disabled={addingBatch || !batchNumber || !expiryDate}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-              >
-                {addingBatch ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              <Field label="หมายเหตุ">
+                <input value={batchNote} onChange={(e) => setBatchNote(e.target.value)} placeholder="หมายเหตุ..."
+                  className="w-full px-3.5 py-2.5 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              </Field>
+              {batchMsg && <Msg type={batchMsg.type} text={batchMsg.text} />}
+              <button onClick={addBatch} disabled={addingBatch || !batchNumber || !expiryDate}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2">
+                {addingBatch ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                 บันทึก Batch
               </button>
             </div>
@@ -400,21 +290,18 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
             const selectedBatch = batches.find((b) => b.id === adjustBatchId) ?? null;
             const canSubmit = adjustQty !== 0 && adjustNote.trim() && (!hasBatches || adjustBatchId !== "");
             return (
-              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
-                <h3 className="text-sm font-semibold text-gray-800">ปรับ stock</h3>
-                <p className="text-xs text-gray-500">ใส่ตัวเลขบวก (+) เพื่อเพิ่ม หรือลบ (−) เพื่อลด</p>
+              <div className="bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-600 rounded-2xl p-5 space-y-4">
+                <h3 className="text-base font-bold text-gray-800 dark:text-gray-100">ปรับ stock</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">ใส่ตัวเลขบวก (+) เพื่อเพิ่ม หรือลบ (−) เพื่อลด</p>
 
                 {hasBatches ? (
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Batch ที่ปรับ <span className="text-red-500">*</span></label>
-                    <select
-                      value={adjustBatchId}
-                      onChange={(e) => setAdjustBatchId(e.target.value)}
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1.5">Batch ที่ปรับ <span className="text-red-500">*</span></p>
+                    <select value={adjustBatchId} onChange={(e) => setAdjustBatchId(e.target.value)}
                       className={cn(
-                        "w-full px-3 py-2 border bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400",
-                        !adjustBatchId ? "border-amber-300 bg-amber-50/50" : "border-gray-200"
-                      )}
-                    >
+                        "w-full px-3.5 py-2.5 border bg-white dark:bg-gray-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400",
+                        !adjustBatchId ? "border-amber-300 dark:border-amber-700" : "border-gray-200 dark:border-gray-600"
+                      )}>
                       <option value="">— เลือก Batch —</option>
                       {batches.map((b) => {
                         const isExpired = b.expiryDate < today;
@@ -427,62 +314,39 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
                         );
                       })}
                     </select>
-                    {!adjustBatchId && (
-                      <p className="text-[11px] text-amber-600 mt-1">ต้องเลือก Batch เพื่อให้ยอดสต๊อกตรงกัน</p>
-                    )}
                     {selectedBatch && (
-                      <div className="mt-2 flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
-                        <Package size={13} className="text-blue-500 flex-shrink-0" />
-                        <div className="text-xs text-blue-700">
-                          คงเหลือใน Batch นี้: <span className="font-bold">{selectedBatch.quantity} {medicine.unit}</span>
+                      <div className="mt-2.5 flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl px-3.5 py-2.5">
+                        <Package size={14} className="text-blue-500 flex-shrink-0" />
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          คงเหลือใน Batch: <span className="font-bold">{selectedBatch.quantity} {medicine.unit}</span>
                           {adjustQty !== 0 && (
-                            <span className={cn("ml-2 font-semibold", (selectedBatch.quantity + adjustQty) < 0 ? "text-red-600" : "text-gray-700")}>
+                            <span className={cn("ml-2 font-semibold", (selectedBatch.quantity + adjustQty) < 0 ? "text-red-600" : "text-gray-700 dark:text-gray-200")}>
                               → {Math.max(0, selectedBatch.quantity + adjustQty)} {medicine.unit}
                             </span>
                           )}
-                        </div>
+                        </p>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2">
-                    <AlertCircle size={13} className="text-gray-400" />
-                    <p className="text-xs text-gray-500">ยังไม่มี Batch — การปรับจะอัพเดตเฉพาะยอดในระบบ</p>
+                  <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-xl px-3.5 py-3">
+                    <AlertCircle size={15} className="text-gray-400 flex-shrink-0" />
+                    <p className="text-sm text-gray-500 dark:text-gray-400">ยังไม่มี Batch — การปรับจะอัพเดตเฉพาะยอดในระบบ</p>
                   </div>
                 )}
 
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">จำนวนที่ปรับ</label>
-                  <input
-                    type="number"
-                    value={adjustQty}
-                    onChange={(e) => setAdjustQty(parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-gray-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">เหตุผล <span className="text-red-500">*</span></label>
-                  <input
-                    value={adjustNote}
-                    onChange={(e) => setAdjustNote(e.target.value)}
-                    placeholder="ระบุเหตุผล..."
-                    className="w-full px-3 py-2 border border-gray-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                </div>
-                {adjustMsg && (
-                  <div className={cn("flex items-center gap-1.5 text-xs rounded-xl px-3 py-2",
-                    adjustMsg.type === "ok" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-                  )}>
-                    {adjustMsg.type === "ok" ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
-                    {adjustMsg.text}
-                  </div>
-                )}
-                <button
-                  onClick={adjustStock}
-                  disabled={adjusting || !canSubmit}
-                  className="w-full py-2.5 bg-gray-700 hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-                >
-                  {adjusting ? <Loader2 size={14} className="animate-spin" /> : null}
+                <Field label="จำนวนที่ปรับ">
+                  <input type="number" value={adjustQty} onChange={(e) => setAdjustQty(parseInt(e.target.value) || 0)}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                </Field>
+                <Field label={<>เหตุผล <span className="text-red-500">*</span></>}>
+                  <input value={adjustNote} onChange={(e) => setAdjustNote(e.target.value)} placeholder="ระบุเหตุผล..."
+                    className="w-full px-3.5 py-2.5 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                </Field>
+                {adjustMsg && <Msg type={adjustMsg.type} text={adjustMsg.text} />}
+                <button onClick={adjustStock} disabled={adjusting || !canSubmit}
+                  className="w-full py-3 bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-500 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2">
+                  {adjusting ? <Loader2 size={16} className="animate-spin" /> : null}
                   ยืนยันการปรับ
                 </button>
               </div>
@@ -490,56 +354,59 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
           })()}
         </div>
 
-        {/* Right: Batches + Stock logs */}
-        <div className="lg:col-span-2 space-y-4">
+        {/* ── Right column ───────────────────────────────── */}
+        <div className="lg:col-span-2 space-y-5">
+
           {/* Batches */}
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-700">Batches ({batches.length})</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700">
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-base font-bold text-gray-700 dark:text-gray-200">
+                Batches <span className="text-gray-400 dark:text-gray-500 font-normal">({batches.length})</span>
+              </h2>
             </div>
             {batches.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">ยังไม่มี batch</p>
+              <p className="text-sm text-gray-400 text-center py-10">ยังไม่มี batch</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">เลข Batch</th>
-                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">จำนวน</th>
-                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">วันหมดอายุ</th>
-                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">วันรับเข้า</th>
-                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">หมายเหตุ</th>
+                    <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
+                      <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">เลข Batch</th>
+                      <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">จำนวน</th>
+                      <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">วันหมดอายุ</th>
+                      <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">วันรับเข้า</th>
+                      <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">หมายเหตุ</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                     {batches.map((b) => {
                       const isExpired = b.expiryDate < today;
                       const isExpiring = !isExpired && b.expiryDate <= thirtyDaysLater;
                       return (
-                        <tr
-                          key={b.id}
-                          className={cn(
-                            "transition-colors",
-                            isExpired ? "bg-red-50" : isExpiring ? "bg-orange-50" : "hover:bg-gray-50/60"
-                          )}
-                        >
-                          <td className="px-4 py-2.5 font-mono text-xs font-medium">{b.batchNumber}</td>
-                          <td className="px-4 py-2.5">
-                            <span className="font-semibold">{b.quantity}</span>
-                            <span className="text-gray-400 ml-1 text-xs">{medicine.unit}</span>
+                        <tr key={b.id} className={cn(
+                          "transition-colors",
+                          isExpired ? "bg-red-50 dark:bg-red-950/20" :
+                          isExpiring ? "bg-orange-50 dark:bg-orange-950/20" :
+                          "hover:bg-gray-50/60 dark:hover:bg-gray-700/30"
+                        )}>
+                          <td className="px-5 py-3.5 font-mono text-sm font-semibold text-gray-700 dark:text-gray-200">{b.batchNumber}</td>
+                          <td className="px-5 py-3.5">
+                            <span className="text-base font-bold text-gray-800 dark:text-gray-100">{b.quantity}</span>
+                            <span className="text-sm text-gray-400 dark:text-gray-500 ml-1.5">{medicine.unit}</span>
                           </td>
-                          <td className="px-4 py-2.5">
-                            <span className={cn(
-                              "text-xs font-medium",
-                              isExpired ? "text-red-600" : isExpiring ? "text-orange-600" : "text-gray-700"
+                          <td className="px-5 py-3.5">
+                            <span className={cn("text-sm font-semibold",
+                              isExpired ? "text-red-600 dark:text-red-400" :
+                              isExpiring ? "text-orange-600 dark:text-orange-400" :
+                              "text-gray-700 dark:text-gray-200"
                             )}>
                               {formatDate(b.expiryDate)}
-                              {isExpired && " (หมดอายุ)"}
-                              {isExpiring && " (ใกล้หมด)"}
                             </span>
+                            {isExpired && <span className="ml-2 text-xs bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full font-semibold">หมดอายุ</span>}
+                            {isExpiring && <span className="ml-2 text-xs bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full font-semibold">ใกล้หมด</span>}
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-gray-400">{formatDate(b.receivedAt)}</td>
-                          <td className="px-4 py-2.5 text-xs text-gray-500">{b.note ?? "—"}</td>
+                          <td className="px-5 py-3.5 text-sm text-gray-400 dark:text-gray-500">{formatDate(b.receivedAt)}</td>
+                          <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-gray-400">{b.note ?? "—"}</td>
                         </tr>
                       );
                     })}
@@ -550,34 +417,36 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
           </div>
 
           {/* Stock logs */}
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-700">ประวัติการเคลื่อนไหว</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700">
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-base font-bold text-gray-700 dark:text-gray-200">ประวัติการเคลื่อนไหว</h2>
             </div>
             {logs.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">ยังไม่มีประวัติ</p>
+              <p className="text-sm text-gray-400 text-center py-10">ยังไม่มีประวัติ</p>
             ) : (
-              <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+              <div className="divide-y divide-gray-50 dark:divide-gray-700 max-h-96 overflow-y-auto">
                 {logs.map((log) => {
-                  const action = ACTION_LABEL[log.action] ?? { label: log.action, icon: null, color: "text-gray-500" };
+                  const meta = ACTION_META[log.action] ?? { label: log.action, icon: null, color: "text-gray-500", bg: "bg-gray-100" };
                   return (
-                    <div key={log.id} className="flex items-center gap-3 px-4 py-3">
-                      <div className={cn("flex-shrink-0", action.color)}>{action.icon}</div>
+                    <div key={log.id} className="flex items-center gap-4 px-5 py-4">
+                      <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0", meta.bg)}>
+                        <span className={meta.color}>{meta.icon}</span>
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={cn("text-xs font-semibold", action.color)}>{action.label}</span>
-                          <span className={cn("text-sm font-bold",
-                            log.quantityChange > 0 ? "text-green-600" : "text-red-600"
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={cn("text-sm font-bold", meta.color)}>{meta.label}</span>
+                          <span className={cn("text-base font-bold",
+                            log.quantityChange > 0 ? "text-emerald-600" : "text-red-600"
                           )}>
-                            {log.quantityChange > 0 ? "+" : ""}{log.quantityChange}
+                            {log.quantityChange > 0 ? "+" : ""}{log.quantityChange} {medicine.unit}
                           </span>
-                          <span className="text-xs text-gray-400">
-                            → คงเหลือ {log.remainingStock}
+                          <span className="text-sm text-gray-400 dark:text-gray-500">
+                            → คงเหลือ <span className="font-semibold text-gray-600 dark:text-gray-300">{log.remainingStock}</span>
                           </span>
                         </div>
-                        {log.note && <p className="text-xs text-gray-400 truncate">{log.note}</p>}
+                        {log.note && <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5 truncate">{log.note}</p>}
                       </div>
-                      <span className="text-xs text-gray-400 flex-shrink-0 whitespace-nowrap">
+                      <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 whitespace-nowrap">
                         {formatDateTime(log.createdAt)}
                       </span>
                     </div>
@@ -588,6 +457,26 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-1.5">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+function Msg({ type, text }: { type: "ok" | "err"; text: string }) {
+  return (
+    <div className={cn("flex items-center gap-2 text-sm rounded-xl px-4 py-2.5",
+      type === "ok" ? "bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400"
+                    : "bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400"
+    )}>
+      {type === "ok" ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />} {text}
     </div>
   );
 }

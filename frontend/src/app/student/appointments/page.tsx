@@ -299,15 +299,15 @@ export default function StudentAppointmentsPage() {
     !isSlotPast(selectedDate, selectedSlot?.startTime ?? "");
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="bg-slate-100 dark:bg-gray-900 min-h-screen">
       {/* Header */}
-      <div className="bg-white border-b border-gray-100 px-4 pt-10 pb-4">
-        <h1 className="font-bold text-xl text-gray-900">การนัดหมาย</h1>
-        <p className="text-gray-400 text-sm mt-0.5">จองนัดพบห้องพยาบาล</p>
+      <div className="bg-gradient-to-br from-blue-800 to-blue-950 px-5 pt-10 pb-5">
+        <h1 className="font-bold text-2xl text-white">การนัดหมาย</h1>
+        <p className="text-blue-200 text-sm mt-0.5">จองนัดพบห้องพยาบาล</p>
       </div>
 
       {/* Tabs */}
-      <div className="bg-white border-b border-gray-200 flex sticky top-0 z-10">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex sticky top-0 z-10">
         {[
           { key: "upcoming", label: "กำลังจะมาถึง" },
           { key: "create", label: "จองนัดใหม่" },
@@ -317,10 +317,10 @@ export default function StudentAppointmentsPage() {
             key={key}
             onClick={() => setTab(key as typeof tab)}
             className={cn(
-              "flex-1 py-3 text-xs font-semibold border-b-2 transition-colors",
+              "flex-1 py-3.5 text-sm font-semibold border-b-2 transition-colors",
               tab === key
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-400 hover:text-gray-600"
+                ? "border-blue-700 text-blue-700 dark:border-blue-400 dark:text-blue-400"
+                : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700"
             )}
           >
             {label}
@@ -328,21 +328,21 @@ export default function StudentAppointmentsPage() {
         ))}
       </div>
 
-      <div className="px-4 py-4">
+      <div className="px-4 py-5">
         {/* ── Upcoming ── */}
         {tab === "upcoming" && (
           <div className="space-y-3">
             {loadingApts ? (
               <div className="py-10 flex justify-center">
-                <Loader2 size={24} className="animate-spin text-gray-300" />
+                <Loader2 size={24} className="animate-spin text-gray-400" />
               </div>
             ) : upcoming.length === 0 ? (
-              <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
-                <Calendar size={36} className="mx-auto text-gray-200 mb-3" />
-                <p className="text-gray-500 text-sm font-medium">ยังไม่มีนัดหมาย</p>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center shadow-sm border border-gray-200 dark:border-gray-700">
+                <Calendar size={36} className="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+                <p className="text-gray-600 dark:text-gray-300 text-base font-medium">ยังไม่มีนัดหมาย</p>
                 <button
                   onClick={() => setTab("create")}
-                  className="mt-3 text-blue-600 text-sm font-semibold hover:underline"
+                  className="mt-3 text-blue-700 dark:text-blue-400 text-sm font-semibold hover:underline"
                 >
                   จองนัดใหม่ →
                 </button>
@@ -367,8 +367,8 @@ export default function StudentAppointmentsPage() {
             ) : (
               <>
                 {/* Step 1: Calendar */}
-                <div className="bg-white rounded-2xl shadow-sm p-4">
-                  <h2 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                  <h2 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                     <span className="w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">
                       1
                     </span>
@@ -388,8 +388,8 @@ export default function StudentAppointmentsPage() {
 
                 {/* Step 2: Slot */}
                 {selectedDate && (
-                  <div className="bg-white rounded-2xl shadow-sm p-4">
-                    <h2 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                    <h2 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
                       <span className="w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">
                         2
                       </span>
@@ -443,8 +443,8 @@ export default function StudentAppointmentsPage() {
 
                 {/* Step 3: Reason + Notes */}
                 {selectedSlot && (
-                  <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
-                    <h2 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+                    <h2 className="text-base font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                       <span className="w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold">
                         3
                       </span>
@@ -542,9 +542,9 @@ export default function StudentAppointmentsPage() {
                 <Loader2 size={24} className="animate-spin text-gray-300" />
               </div>
             ) : history.length === 0 ? (
-              <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
-                <Calendar size={32} className="mx-auto text-gray-200 mb-3" />
-                <p className="text-gray-400 text-sm">ยังไม่มีประวัตินัดหมาย</p>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center shadow-sm border border-gray-200 dark:border-gray-700">
+                <Calendar size={32} className="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+                <p className="text-gray-500 dark:text-gray-400 text-base">ยังไม่มีประวัตินัดหมาย</p>
               </div>
             ) : (
               history.map((apt) => (
@@ -697,9 +697,9 @@ function AppointmentCard({ apt, onClick }: { apt: Appointment; onClick: () => vo
   return (
     <button
       onClick={onClick}
-      className="w-full bg-white rounded-2xl shadow-sm overflow-hidden flex text-left active:scale-[0.98] transition-transform"
+      className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex text-left active:scale-[0.98] transition-transform"
     >
-      <div className="w-16 bg-blue-600 flex flex-col items-center justify-center text-white flex-shrink-0 py-4">
+      <div className="w-18 w-[72px] bg-blue-800 dark:bg-blue-900 flex flex-col items-center justify-center text-white flex-shrink-0 py-4">
         <span className="text-2xl font-extrabold leading-none">{d.getDate()}</span>
         <span className="text-blue-200 text-xs mt-0.5">
           {d.toLocaleDateString("th-TH", { month: "short" })}
@@ -708,15 +708,15 @@ function AppointmentCard({ apt, onClick }: { apt: Appointment; onClick: () => vo
           {d.toLocaleDateString("th-TH", { year: "numeric" })}
         </span>
       </div>
-      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center">
+      <div className="flex-1 min-w-0 p-3.5 flex flex-col justify-center">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-            <Clock size={13} className="text-blue-400" />
+          <p className="text-base font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1.5">
+            <Clock size={14} className="text-blue-600 dark:text-blue-400" />
             {apt.appointmentTime.slice(0, 5)} น.
           </p>
           <span
             className={cn(
-              "text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0",
+              "text-xs font-medium px-2.5 py-0.5 rounded-full flex-shrink-0",
               cfg.bg,
               cfg.color
             )}
@@ -724,13 +724,13 @@ function AppointmentCard({ apt, onClick }: { apt: Appointment; onClick: () => vo
             {statusLabel(apt.status)}
           </span>
         </div>
-        <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-          <User size={11} /> {apt.staffName}
+        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 flex items-center gap-1">
+          <User size={13} /> {apt.staffName}
         </p>
-        {apt.reason && <p className="text-xs text-gray-400 truncate mt-0.5">{apt.reason}</p>}
+        {apt.reason && <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5">{apt.reason}</p>}
       </div>
       <div className="flex items-center pr-3">
-        <ChevronRight size={15} className="text-gray-300" />
+        <ChevronRight size={16} className="text-gray-400" />
       </div>
     </button>
   );

@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Settings, User, Bell, Users, Database, Save, Loader2,
   CheckCircle2, Shield, Phone, Plus, Trash2, AlertCircle,
   UserCheck, UserX, X, Search, ChevronLeft, ChevronRight, KeyRound,
+  FileText, Activity, ShieldAlert, Megaphone, ToggleLeft, ToggleRight, Send,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { usePushNotification } from "@/hooks/usePushNotification";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { SystemSetting, EmergencyContact } from "@/types";
 
-type TabType = "profile" | "notifications" | "contacts" | "users" | "system" | "backup";
+type TabType = "profile" | "notifications" | "contacts" | "users" | "system" | "backup"
+  | "audit" | "treatments" | "security" | "broadcast";
 
 export default function SettingsPage() {
   const { user } = useAuthContext();
@@ -23,6 +26,10 @@ export default function SettingsPage() {
     { key: "notifications", label: "การแจ้งเตือน", icon: <Bell size={16} /> },
     { key: "contacts", label: "สมุดโทรศัพท์", icon: <Phone size={16} /> },
     { key: "users", label: "ผู้ใช้งาน", icon: <Users size={16} />, adminOnly: true },
+    { key: "treatments", label: "ประเภทการรักษา", icon: <Activity size={16} />, adminOnly: true },
+    { key: "audit", label: "ประวัติการใช้งาน", icon: <FileText size={16} />, adminOnly: true },
+    { key: "security", label: "ความปลอดภัย", icon: <ShieldAlert size={16} />, adminOnly: true },
+    { key: "broadcast", label: "ประกาศ", icon: <Megaphone size={16} />, adminOnly: true },
     { key: "system", label: "ระบบ", icon: <Settings size={16} />, adminOnly: true },
     { key: "backup", label: "สำรองข้อมูล", icon: <Database size={16} />, adminOnly: true },
   ];
@@ -63,6 +70,10 @@ export default function SettingsPage() {
           {tab === "notifications" && <NotificationsTab />}
           {tab === "contacts" && <ContactsTab />}
           {tab === "users" && isAdmin && <UsersTab />}
+          {tab === "treatments" && isAdmin && <TreatmentTypesTab />}
+          {tab === "audit" && isAdmin && <AuditLogsTab />}
+          {tab === "security" && isAdmin && <SecurityTab />}
+          {tab === "broadcast" && isAdmin && <BroadcastTab />}
           {tab === "system" && isAdmin && <SystemTab />}
           {tab === "backup" && isAdmin && <BackupTab />}
         </div>
@@ -172,6 +183,8 @@ function loadNotifPrefs(): Record<string, boolean> {
 
 function NotificationsTab() {
   const [prefs, setPrefs] = useState<Record<string, boolean>>(loadNotifPrefs);
+  const { isSupported, permission, isSubscribed, isLoading, subscribe, unsubscribe } =
+    usePushNotification();
 
   const toggle = (key: string) => {
     setPrefs((prev) => {
@@ -181,30 +194,102 @@ function NotificationsTab() {
     });
   };
 
+  const handlePushToggle = async () => {
+    if (isSubscribed) {
+      await unsubscribe();
+    } else {
+      await subscribe();
+    }
+  };
+
   return (
-    <div className="space-y-4 max-w-md">
-      <h2 className="font-semibold text-gray-800">การแจ้งเตือน</h2>
-      <p className="text-sm text-gray-500">ตั้งค่าการรับการแจ้งเตือนต่างๆ</p>
-      <div className="space-y-3">
-        {NOTIF_ITEMS.map(({ key, label, desc }) => (
-          <div
-            key={key}
-            onClick={() => toggle(key)}
-            className="flex items-center justify-between p-3 border border-gray-100 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors"
-          >
-            <div>
-              <p className="text-sm font-medium text-gray-700">{label}</p>
-              <p className="text-xs text-gray-400">{desc}</p>
+    <div className="space-y-6 max-w-md">
+      {/* Push Notification */}
+      <div>
+        <h2 className="font-semibold text-gray-800">Push Notification</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          รับการแจ้งเตือนแม้ไม่ได้เปิดเว็บไซต์
+        </p>
+        <div className="mt-3">
+          {!isSupported ? (
+            <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-xl text-sm text-amber-700">
+              <AlertCircle size={16} />
+              <div>
+                <p>Push Notification ใช้งานไม่ได้</p>
+                {typeof window !== "undefined" && location.protocol !== "https:" && location.hostname !== "localhost" ? (
+                  <p className="text-xs mt-0.5 text-amber-500">ต้องเปิดผ่าน HTTPS หรือ localhost เท่านั้น</p>
+                ) : (
+                  <p className="text-xs mt-0.5 text-amber-500">เบราว์เซอร์ไม่รองรับ</p>
+                )}
+              </div>
             </div>
-            <input
-              type="checkbox"
-              checked={prefs[key] ?? true}
-              onChange={() => toggle(key)}
-              onClick={(e) => e.stopPropagation()}
-              className="w-4 h-4 accent-blue-600"
-            />
-          </div>
-        ))}
+          ) : permission === "denied" ? (
+            <div className="flex items-center gap-2 p-3 bg-red-50 rounded-xl text-sm text-red-600">
+              <AlertCircle size={16} />
+              Push Notification ถูกบล็อก — กรุณาเปิดในตั้งค่าเบราว์เซอร์
+            </div>
+          ) : (
+            <div
+              onClick={handlePushToggle}
+              className="flex items-center justify-between p-3 border border-gray-100 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors"
+            >
+              <div>
+                <p className="text-sm font-medium text-gray-700">
+                  {isSubscribed ? "เปิดอยู่" : "ปิดอยู่"}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {isSubscribed
+                    ? "คุณจะได้รับ push notification บนอุปกรณ์นี้"
+                    : "เปิดเพื่อรับการแจ้งเตือนแม้ปิดเว็บไซต์"}
+                </p>
+              </div>
+              {isLoading ? (
+                <Loader2 size={18} className="animate-spin text-blue-600" />
+              ) : (
+                <div
+                  className={cn(
+                    "w-10 h-6 rounded-full relative transition-colors",
+                    isSubscribed ? "bg-blue-600" : "bg-gray-300"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform",
+                      isSubscribed ? "left-5" : "left-1"
+                    )}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* In-app notification preferences */}
+      <div>
+        <h2 className="font-semibold text-gray-800">การแจ้งเตือนในแอป</h2>
+        <p className="text-sm text-gray-500 mt-1">ตั้งค่าประเภทการแจ้งเตือนที่ต้องการรับ</p>
+        <div className="space-y-3 mt-3">
+          {NOTIF_ITEMS.map(({ key, label, desc }) => (
+            <div
+              key={key}
+              onClick={() => toggle(key)}
+              className="flex items-center justify-between p-3 border border-gray-100 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors"
+            >
+              <div>
+                <p className="text-sm font-medium text-gray-700">{label}</p>
+                <p className="text-xs text-gray-400">{desc}</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={prefs[key] ?? true}
+                onChange={() => toggle(key)}
+                onClick={(e) => e.stopPropagation()}
+                className="w-4 h-4 accent-blue-600"
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -801,7 +886,594 @@ function UsersTab() {
   );
 }
 
+// ── Treatment Types Tab ───────────────────────────────────────────────────────
+
+interface TreatmentTypeItem {
+  id: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+function TreatmentTypesTab() {
+  const [types, setTypes] = useState<TreatmentTypeItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  const fetchTypes = useCallback(() => {
+    api.get<TreatmentTypeItem[]>("/admin/treatment-types").then((res) => {
+      if (res.success && res.data) setTypes(res.data);
+      setLoading(false);
+    });
+  }, []);
+
+  useEffect(() => { fetchTypes(); }, [fetchTypes]);
+
+  const handleCreate = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    setError("");
+    const res = await api.post("/admin/treatment-types", { name: name.trim() });
+    setSaving(false);
+    if (res.success) {
+      setName("");
+      fetchTypes();
+    } else {
+      setError(res.message ?? "เกิดข้อผิดพลาด");
+    }
+  };
+
+  const handleToggle = async (id: string) => {
+    setTogglingId(id);
+    const res = await api.patch(`/admin/treatment-types/${id}/toggle`);
+    setTogglingId(null);
+    if (res.success) fetchTypes();
+  };
+
+  return (
+    <div className="space-y-4 max-w-lg">
+      <div>
+        <h2 className="font-semibold text-gray-800">ประเภทการรักษา</h2>
+        <p className="text-sm text-gray-500 mt-1">จัดการประเภทการรักษาที่ใช้บันทึกเมื่อรับผู้ป่วย</p>
+      </div>
+
+      {/* Add form */}
+      <div className="flex gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+          placeholder="ชื่อประเภทการรักษาใหม่..."
+          className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <button
+          onClick={handleCreate}
+          disabled={saving || !name.trim()}
+          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-sm font-semibold transition-colors"
+        >
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          เพิ่ม
+        </button>
+      </div>
+      {error && (
+        <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-xl px-3 py-2">
+          <AlertCircle size={14} /> {error}
+        </div>
+      )}
+
+      {/* List */}
+      {loading ? (
+        <Loader2 size={20} className="animate-spin text-gray-300" />
+      ) : types.length === 0 ? (
+        <p className="text-sm text-gray-400">ยังไม่มีประเภทการรักษา</p>
+      ) : (
+        <div className="space-y-2">
+          {types.map((t) => (
+            <div key={t.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl">
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  "w-2 h-2 rounded-full",
+                  t.isActive ? "bg-green-500" : "bg-gray-300"
+                )} />
+                <span className={cn("text-sm", t.isActive ? "text-gray-700" : "text-gray-400 line-through")}>
+                  {t.name}
+                </span>
+              </div>
+              <button
+                onClick={() => handleToggle(t.id)}
+                disabled={togglingId === t.id}
+                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                {togglingId === t.id ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : t.isActive ? (
+                  <ToggleRight size={20} className="text-green-600" />
+                ) : (
+                  <ToggleLeft size={20} className="text-gray-400" />
+                )}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Audit Logs Tab ────────────────────────────────────────────────────────────
+
+interface AuditLogItem {
+  id: string;
+  userId: string | null;
+  userName: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  newValues: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+const ACTION_LABELS: Record<string, { label: string; color: string }> = {
+  POST: { label: "สร้าง", color: "bg-green-100 text-green-700" },
+  PUT: { label: "แก้ไข", color: "bg-blue-100 text-blue-700" },
+  PATCH: { label: "อัปเดต", color: "bg-yellow-100 text-yellow-700" },
+  DELETE: { label: "ลบ", color: "bg-red-100 text-red-700" },
+};
+
+function AuditLogsTab() {
+  const [logs, setLogs] = useState<AuditLogItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [actionFilter, setActionFilter] = useState("");
+  const [entityFilter, setEntityFilter] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => { setPage(1); }, [debouncedSearch, actionFilter, entityFilter]);
+
+  useEffect(() => {
+    setLoading(true);
+    const params = new URLSearchParams({ page: String(page), limit: "15" });
+    if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+    if (actionFilter) params.set("action", actionFilter);
+    if (entityFilter) params.set("entityType", entityFilter);
+
+    api.get<AuditLogItem[]>(`/admin/audit-logs?${params}`).then((res) => {
+      if (res.success) {
+        setLogs(Array.isArray(res.data) ? res.data : []);
+        setTotalPages(res.totalPages ?? 1);
+      }
+      setLoading(false);
+    });
+  }, [page, debouncedSearch, actionFilter, entityFilter]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="font-semibold text-gray-800">ประวัติการใช้งาน</h2>
+        <p className="text-sm text-gray-500 mt-1">บันทึกการเปลี่ยนแปลงข้อมูลในระบบ</p>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหาชื่อผู้ใช้ / entity..."
+            className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+        <select
+          value={actionFilter}
+          onChange={(e) => setActionFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        >
+          <option value="">ทุก Action</option>
+          <option value="POST">สร้าง (POST)</option>
+          <option value="PUT">แก้ไข (PUT)</option>
+          <option value="PATCH">อัปเดต (PATCH)</option>
+          <option value="DELETE">ลบ (DELETE)</option>
+        </select>
+        <select
+          value={entityFilter}
+          onChange={(e) => setEntityFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        >
+          <option value="">ทุกประเภท</option>
+          <option value="incidents">เหตุฉุกเฉิน</option>
+          <option value="visits">การรักษา</option>
+          <option value="medicines">ยา/เวชภัณฑ์</option>
+          <option value="appointments">นัดหมาย</option>
+          <option value="users">ผู้ใช้งาน</option>
+          <option value="settings">ตั้งค่า</option>
+          <option value="backups">สำรองข้อมูล</option>
+        </select>
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 size={24} className="animate-spin text-gray-300" />
+        </div>
+      ) : logs.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-8">ไม่พบข้อมูล</p>
+      ) : (
+        <div className="space-y-2">
+          {logs.map((log) => {
+            const a = ACTION_LABELS[log.action] ?? { label: log.action, color: "bg-gray-100 text-gray-600" };
+            return (
+              <div key={log.id} className="flex items-start gap-3 p-3 border border-gray-100 rounded-xl text-sm">
+                <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 mt-0.5", a.color)}>
+                  {a.label}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-gray-700">
+                    <span className="font-medium">{log.userName ?? "ระบบ"}</span>
+                    {" "}
+                    <span className="text-gray-400">{a.label}</span>
+                    {" "}
+                    <span className="text-blue-600">{log.entityType}</span>
+                    {log.entityId && (
+                      <span className="text-gray-400 text-xs ml-1">({log.entityId.slice(0, 8)}...)</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {new Date(log.createdAt).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-2">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-30 hover:bg-gray-50"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <span className="text-xs text-gray-500">{page} / {totalPages}</span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-30 hover:bg-gray-50"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Security Tab (Login Attempts) ─────────────────────────────────────────────
+
+interface LoginAttemptItem {
+  id: string;
+  email: string;
+  ipAddress: string | null;
+  success: boolean;
+  failureReason: string | null;
+  createdAt: string;
+}
+
+interface LoginStats {
+  totalToday: number;
+  failedToday: number;
+  lockedAccounts: number;
+  topFailedEmails: { email: string; count: number }[];
+}
+
+function SecurityTab() {
+  const [attempts, setAttempts] = useState<LoginAttemptItem[]>([]);
+  const [stats, setStats] = useState<LoginStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [successFilter, setSuccessFilter] = useState("");
+
+  useEffect(() => { setPage(1); }, [successFilter]);
+
+  useEffect(() => {
+    const params = new URLSearchParams({ page: String(page), limit: "15" });
+    if (successFilter !== "") params.set("success", successFilter);
+
+    Promise.all([
+      api.get<LoginAttemptItem[]>(`/admin/login-attempts?${params}`),
+      page === 1 ? api.get<LoginStats>("/admin/login-attempts/stats") : Promise.resolve(null),
+    ]).then(([attRes, statsRes]) => {
+      if (attRes.success) {
+        setAttempts(Array.isArray(attRes.data) ? attRes.data : []);
+        setTotalPages(attRes.totalPages ?? 1);
+      }
+      if (statsRes && statsRes.success && statsRes.data) setStats(statsRes.data);
+      setLoading(false);
+    });
+  }, [page, successFilter]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="font-semibold text-gray-800">ความปลอดภัย</h2>
+        <p className="text-sm text-gray-500 mt-1">ตรวจสอบการเข้าสู่ระบบและความผิดปกติ</p>
+      </div>
+
+      {/* Stats cards */}
+      {stats && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="p-3 bg-blue-50 rounded-xl text-center">
+            <p className="text-2xl font-bold text-blue-700">{stats.totalToday}</p>
+            <p className="text-xs text-blue-500">เข้าสู่ระบบวันนี้</p>
+          </div>
+          <div className="p-3 bg-red-50 rounded-xl text-center">
+            <p className="text-2xl font-bold text-red-600">{stats.failedToday}</p>
+            <p className="text-xs text-red-500">ล้มเหลววันนี้</p>
+          </div>
+          <div className="p-3 bg-orange-50 rounded-xl text-center">
+            <p className="text-2xl font-bold text-orange-600">{stats.lockedAccounts}</p>
+            <p className="text-xs text-orange-500">ถูกล็อก</p>
+          </div>
+        </div>
+      )}
+
+      {/* Top failed emails */}
+      {stats && stats.topFailedEmails.length > 0 && (
+        <div className="p-3 bg-red-50 rounded-xl">
+          <p className="text-xs font-semibold text-red-700 mb-2">อีเมลที่ล้มเหลวบ่อยวันนี้</p>
+          <div className="space-y-1">
+            {stats.topFailedEmails.slice(0, 5).map((e) => (
+              <div key={e.email} className="flex justify-between text-xs">
+                <span className="text-red-600 truncate">{e.email}</span>
+                <span className="text-red-500 font-semibold">{e.count} ครั้ง</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filter */}
+      <select
+        value={successFilter}
+        onChange={(e) => setSuccessFilter(e.target.value)}
+        className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+      >
+        <option value="">ทั้งหมด</option>
+        <option value="true">สำเร็จ</option>
+        <option value="false">ล้มเหลว</option>
+      </select>
+
+      {/* Attempts list */}
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 size={24} className="animate-spin text-gray-300" />
+        </div>
+      ) : attempts.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-8">ไม่พบข้อมูล</p>
+      ) : (
+        <div className="space-y-2">
+          {attempts.map((a) => (
+            <div key={a.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl text-sm">
+              <span className={cn(
+                "w-2 h-2 rounded-full flex-shrink-0",
+                a.success ? "bg-green-500" : "bg-red-500"
+              )} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-700 font-medium truncate">{a.email}</span>
+                  {!a.success && a.failureReason && (
+                    <span className="text-xs px-1.5 py-0.5 bg-red-50 text-red-500 rounded">
+                      {a.failureReason}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-3 text-xs text-gray-400 mt-0.5">
+                  <span>{new Date(a.createdAt).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}</span>
+                  {a.ipAddress && <span>IP: {a.ipAddress}</span>}
+                </div>
+              </div>
+              <span className={cn(
+                "text-xs px-2 py-0.5 rounded-full flex-shrink-0",
+                a.success ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
+              )}>
+                {a.success ? "สำเร็จ" : "ล้มเหลว"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-2">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-30 hover:bg-gray-50"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <span className="text-xs text-gray-500">{page} / {totalPages}</span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-30 hover:bg-gray-50"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Broadcast Tab ─────────────────────────────────────────────────────────────
+
+interface PushStats {
+  total: number;
+  staff: number;
+  student: number;
+}
+
+function BroadcastTab() {
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [target, setTarget] = useState<"all" | "staff" | "student">("all");
+  const [sending, setSending] = useState(false);
+  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [pushStats, setPushStats] = useState<PushStats | null>(null);
+
+  useEffect(() => {
+    api.get<PushStats>("/admin/broadcast/stats").then((res) => {
+      if (res.success && res.data) setPushStats(res.data);
+    });
+  }, []);
+
+  const handleSend = async () => {
+    if (!title.trim() || !message.trim()) return;
+    setSending(true);
+    setMsg(null);
+    const res = await api.post("/admin/broadcast", { title: title.trim(), message: message.trim(), target });
+    setSending(false);
+    if (res.success) {
+      setMsg({ type: "success", text: "ส่งประกาศเรียบร้อยแล้ว" });
+      setTitle("");
+      setMessage("");
+    } else {
+      setMsg({ type: "error", text: res.message ?? "เกิดข้อผิดพลาด" });
+    }
+  };
+
+  const TARGET_OPTIONS = [
+    { value: "all" as const, label: "ทุกคน" },
+    { value: "staff" as const, label: "เจ้าหน้าที่" },
+    { value: "student" as const, label: "นักศึกษา" },
+  ];
+
+  return (
+    <div className="space-y-4 max-w-lg">
+      <div>
+        <h2 className="font-semibold text-gray-800">ส่งประกาศ</h2>
+        <p className="text-sm text-gray-500 mt-1">ส่งการแจ้งเตือนถึงผู้ใช้ทั้งหมดหรือกลุ่มที่เลือก</p>
+      </div>
+
+      {/* Push stats */}
+      {pushStats && (
+        <div className="flex gap-3 text-xs">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-lg">
+            <Users size={12} className="text-gray-400" />
+            <span className="text-gray-500">อุปกรณ์ Push ทั้งหมด: <strong className="text-gray-700">{pushStats.total}</strong></span>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-lg">
+            <span className="text-blue-500">เจ้าหน้าที่: <strong>{pushStats.staff}</strong></span>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 rounded-lg">
+            <span className="text-green-600">นักศึกษา: <strong>{pushStats.student}</strong></span>
+          </div>
+        </div>
+      )}
+
+      {/* Target selection */}
+      <div>
+        <label className="text-xs text-gray-500 mb-1.5 block">กลุ่มเป้าหมาย</label>
+        <div className="flex gap-2">
+          {TARGET_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setTarget(opt.value)}
+              className={cn(
+                "px-4 py-2 rounded-xl text-sm font-medium transition-colors border",
+                target === opt.value
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Title */}
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block">หัวข้อ</label>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="เช่น ปิดห้องพยาบาลชั่วคราว"
+          maxLength={200}
+          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+      </div>
+
+      {/* Message */}
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block">ข้อความ</label>
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="รายละเอียดประกาศ..."
+          maxLength={1000}
+          rows={4}
+          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+        />
+        <p className="text-xs text-gray-400 text-right mt-1">{message.length}/1000</p>
+      </div>
+
+      {msg && (
+        <div className={cn("flex items-center gap-2 text-xs rounded-xl px-3 py-2",
+          msg.type === "success" ? "text-green-700 bg-green-50" : "text-red-700 bg-red-50"
+        )}>
+          <CheckCircle2 size={14} /> {msg.text}
+        </div>
+      )}
+
+      <button
+        onClick={handleSend}
+        disabled={sending || !title.trim() || !message.trim()}
+        className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-sm font-semibold transition-colors"
+      >
+        {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+        ส่งประกาศ
+      </button>
+    </div>
+  );
+}
+
 // ── System Tab ─────────────────────────────────────────────────────────────────
+
+const SETTING_GROUPS: { label: string; icon: React.ReactNode; keys: string[] }[] = [
+  {
+    label: "ข้อมูลห้องพยาบาล",
+    icon: <Plus size={14} className="text-blue-500" />,
+    keys: ["infirmary_name", "infirmary_phone", "infirmary_lat", "infirmary_lng"],
+  },
+  {
+    label: "เกณฑ์แจ้งเตือน",
+    icon: <AlertCircle size={14} className="text-orange-500" />,
+    keys: ["stock_alert_threshold", "expiry_alert_days", "max_failed_login_attempts", "lock_window_minutes"],
+  },
+  {
+    label: "เวลาทำการ",
+    icon: <Settings size={14} className="text-green-500" />,
+    keys: ["operating_hours_start", "operating_hours_end", "operating_days"],
+  },
+];
 
 function SystemTab() {
   const [settings, setSettings] = useState<SystemSetting[]>([]);
@@ -831,23 +1503,55 @@ function SystemTab() {
     setTimeout(() => setSaved(false), 3000);
   };
 
+  // Group settings: put known keys into groups, rest into "other"
+  const groupedKeys = new Set(SETTING_GROUPS.flatMap((g) => g.keys));
+  const otherSettings = settings.filter((s) => !groupedKeys.has(s.key));
+
+  const renderSettingInput = (s: SystemSetting) => (
+    <div key={s.key}>
+      <label className="text-xs text-gray-500 mb-1 block">{s.description ?? s.key}</label>
+      <input
+        value={s.value ?? ""}
+        onChange={(e) => updateSetting(s.key, e.target.value)}
+        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+      />
+    </div>
+  );
+
   return (
-    <div className="space-y-4 max-w-md">
+    <div className="space-y-5 max-w-lg">
       <h2 className="font-semibold text-gray-800">การตั้งค่าระบบ</h2>
       {loading ? (
         <Loader2 size={20} className="animate-spin text-gray-300" />
       ) : (
-        <div className="space-y-3">
-          {settings.map((s) => (
-            <div key={s.key}>
-              <label className="text-xs text-gray-500 mb-1 block">{s.description ?? s.key}</label>
-              <input
-                value={s.value ?? ""}
-                onChange={(e) => updateSetting(s.key, e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
+        <div className="space-y-5">
+          {SETTING_GROUPS.map((group) => {
+            const groupSettings = group.keys
+              .map((key) => settings.find((s) => s.key === key))
+              .filter((s): s is SystemSetting => !!s);
+            if (groupSettings.length === 0) return null;
+            return (
+              <div key={group.label} className="p-4 bg-gray-50 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2">
+                  {group.icon}
+                  <h3 className="text-sm font-semibold text-gray-700">{group.label}</h3>
+                </div>
+                {groupSettings.map(renderSettingInput)}
+              </div>
+            );
+          })}
+
+          {/* Other settings not in any group */}
+          {otherSettings.length > 0 && (
+            <div className="p-4 bg-gray-50 rounded-2xl space-y-3">
+              <div className="flex items-center gap-2">
+                <Settings size={14} className="text-gray-400" />
+                <h3 className="text-sm font-semibold text-gray-700">อื่นๆ</h3>
+              </div>
+              {otherSettings.map(renderSettingInput)}
             </div>
-          ))}
+          )}
+
           {saved && (
             <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 rounded-xl px-3 py-2">
               <CheckCircle2 size={14} /> บันทึกสำเร็จ

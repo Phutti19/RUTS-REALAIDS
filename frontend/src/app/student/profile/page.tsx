@@ -20,8 +20,10 @@ import {
   ShieldAlert,
   Stethoscope,
   PhoneCall,
+  Bell,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { usePushNotification } from "@/hooks/usePushNotification";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { HealthProfile } from "@/types";
@@ -62,6 +64,9 @@ export default function StudentProfilePage() {
   const [savingHealth, setSavingHealth] = useState(false);
   const [healthMsg, setHealthMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [loadingHealth, setLoadingHealth] = useState(true);
+
+  const { isSupported: pushSupported, permission: pushPermission, isSubscribed: pushSubscribed, isLoading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } =
+    usePushNotification();
 
   useEffect(() => {
     if (user) {
@@ -135,34 +140,34 @@ export default function StudentProfilePage() {
   const avatarGradient = getAvatarColor(firstName || "A");
 
   return (
-    <div className="bg-gray-50">
-      {/* Header with avatar — no overlap needed */}
-      <div className="bg-white border-b border-gray-100 px-4 pt-10 pb-5">
+    <div className="bg-slate-100 dark:bg-gray-900">
+      {/* Header with avatar */}
+      <div className="bg-gradient-to-br from-blue-800 to-blue-950 px-5 pt-10 pb-6">
         <div className="flex items-center gap-4">
           <div
             className={cn(
-              "w-16 h-16 rounded-2xl bg-gradient-to-br flex items-center justify-center flex-shrink-0 shadow-md",
+              "w-[68px] h-[68px] rounded-2xl bg-gradient-to-br flex items-center justify-center flex-shrink-0 shadow-lg ring-2 ring-white/20",
               avatarGradient
             )}
           >
             <span className="text-white font-extrabold text-2xl">{initials}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-gray-900 text-lg truncate">{fullName}</h1>
+            <h1 className="font-bold text-white text-xl truncate">{fullName}</h1>
             {user?.studentId && (
-              <p className="text-xs text-gray-500 mt-0.5">{user.studentId}</p>
+              <p className="text-sm text-blue-200 mt-0.5">{user.studentId}</p>
             )}
-            <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+            <p className="text-sm text-blue-300 truncate">{user?.email}</p>
           </div>
           {health?.bloodType && (
-            <div className="flex-shrink-0 w-11 h-11 bg-red-50 border border-red-100 rounded-xl flex items-center justify-center">
-              <span className="text-red-600 font-bold text-sm">{health.bloodType}</span>
+            <div className="flex-shrink-0 w-12 h-12 bg-white/15 border border-white/20 rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-base">{health.bloodType}</span>
             </div>
           )}
         </div>
       </div>
 
-      <div className="px-4 pt-4 space-y-4 pb-6">
+      <div className="px-4 pt-5 space-y-4 pb-6">
         {/* Personal Info */}
         <SectionCard
           title="ข้อมูลส่วนตัว"
@@ -284,16 +289,57 @@ export default function StudentProfilePage() {
           )}
         </SectionCard>
 
+        {/* Push Notification */}
+        <SectionCard title="การแจ้งเตือน" icon={<Bell size={16} className="text-blue-500" />}>
+          {!pushSupported ? (
+            <div className="flex items-center gap-2 text-sm text-amber-700">
+              <AlertCircle size={14} />
+              <div>
+                <p>Push Notification ใช้งานไม่ได้</p>
+                {typeof window !== "undefined" && location.protocol !== "https:" && location.hostname !== "localhost" ? (
+                  <p className="text-xs mt-0.5 text-amber-500">ต้องเปิดผ่าน HTTPS หรือ localhost เท่านั้น</p>
+                ) : (
+                  <p className="text-xs mt-0.5 text-amber-500">เบราว์เซอร์ไม่รองรับ</p>
+                )}
+              </div>
+            </div>
+          ) : pushPermission === "denied" ? (
+            <div className="flex items-center gap-2 text-sm text-red-500">
+              <AlertCircle size={14} />
+              Push Notification ถูกบล็อก — กรุณาเปิดในตั้งค่าเบราว์เซอร์
+            </div>
+          ) : (
+            <div
+              onClick={() => pushSubscribed ? pushUnsubscribe() : pushSubscribe()}
+              className="flex items-center justify-between cursor-pointer"
+            >
+              <div>
+                <p className="text-sm font-medium text-gray-700">Push Notification</p>
+                <p className="text-xs text-gray-400">
+                  {pushSubscribed ? "รับการแจ้งเตือนบนอุปกรณ์นี้" : "เปิดเพื่อรับแจ้งเตือนแม้ปิดเว็บ"}
+                </p>
+              </div>
+              {pushLoading ? (
+                <Loader2 size={18} className="animate-spin text-blue-600" />
+              ) : (
+                <div className={cn("w-10 h-6 rounded-full relative transition-colors", pushSubscribed ? "bg-blue-600" : "bg-gray-300")}>
+                  <div className={cn("absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform", pushSubscribed ? "left-5" : "left-1")} />
+                </div>
+              )}
+            </div>
+          )}
+        </SectionCard>
+
         {/* Logout */}
         <button
           onClick={async () => { await logout(); router.push("/login"); }}
-          className="w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center justify-between text-red-500 hover:bg-red-50 active:scale-95 transition-all"
+          className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 active:scale-95 transition-all"
         >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-red-100 rounded-xl flex items-center justify-center">
-              <LogOut size={16} className="text-red-500" />
+            <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center">
+              <LogOut size={18} className="text-red-600 dark:text-red-400" />
             </div>
-            <span className="text-sm font-semibold">ออกจากระบบ</span>
+            <span className="text-base font-semibold">ออกจากระบบ</span>
           </div>
           <span className="text-xs text-gray-300">›</span>
         </button>
@@ -318,27 +364,27 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <div className="flex items-center gap-2">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-2.5">
           {icon}
-          <h2 className="text-sm font-semibold text-gray-800">{title}</h2>
+          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">{title}</h2>
         </div>
         {onEdit && (
           <button
             onClick={onEdit}
-            className="flex items-center gap-1 text-xs text-blue-600 font-medium hover:text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+            className="flex items-center gap-1 text-sm text-blue-700 dark:text-blue-400 font-medium hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
           >
-            <Edit2 size={12} /> แก้ไข
+            <Edit2 size={13} /> แก้ไข
           </button>
         )}
         {onCancel && (
-          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600 p-1">
-            <X size={15} />
+          <button onClick={onCancel} className="text-gray-500 hover:text-gray-700 p-1">
+            <X size={16} />
           </button>
         )}
       </div>
-      <div className="p-4">{children}</div>
+      <div className="p-5">{children}</div>
     </div>
   );
 }
@@ -364,12 +410,12 @@ function InfoRow({
   highlight?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 py-2 border-b border-gray-50 last:border-0">
-      <div className="flex items-center gap-2 text-gray-500 flex-shrink-0">
+    <div className="flex items-center justify-between gap-2 py-2.5 border-b border-gray-100 dark:border-gray-700 last:border-0">
+      <div className="flex items-center gap-2.5 text-gray-500 dark:text-gray-400 flex-shrink-0">
         {icon}
-        <span className="text-xs">{label}</span>
+        <span className="text-sm">{label}</span>
       </div>
-      <span className={cn("text-sm text-right", highlight ? "font-bold text-red-600" : "text-gray-700")}>
+      <span className={cn("text-sm text-right", highlight ? "font-bold text-red-600" : "text-gray-800 dark:text-gray-200")}>
         {value}
       </span>
     </div>

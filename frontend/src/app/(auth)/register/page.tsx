@@ -193,7 +193,7 @@ export default function ChangePasswordPage() {
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">ตัวพิมพ์ใหญ่ + ตัวพิมพ์เล็ก + ตัวเลข อย่างน้อย 8 ตัว</p>
+                <p className="text-xs text-gray-500 mt-1">ตัวพิมพ์ใหญ่ + ตัวพิมพ์เล็ก + ตัวเลข อย่างน้อย 8 ตัว</p>
               </div>
 
               <div>

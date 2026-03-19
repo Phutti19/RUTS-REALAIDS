@@ -611,18 +611,42 @@ export class VisitsService {
     id: string;
     firstName: string;
     lastName: string;
-    studentId: string;
+    studentId: string | null;
     email: string;
     role: string;
   }> {
-    const email = dto.email ?? `${dto.studentId}@student.ruts.ac.th`;
+    const id = randomUUID();
+    let email: string;
+    let role: 'student' | 'staff' | 'admin';
+    let studentId: string | null = null;
+    let passwordRaw: string;
 
-    // Check for duplicate student_id
-    const dupStudentId = await this.db.queryOne<{ id: string }>(
-      `SELECT id FROM users WHERE student_id = $1`,
-      [dto.studentId],
-    );
-    if (dupStudentId) throw new ConflictException('รหัสนักศึกษานี้มีในระบบแล้ว');
+    if (dto.patientType === 'student') {
+      // ── นักศึกษา ─────────────────────────────────────────────────────────
+      studentId = dto.studentId!;
+      email = dto.email ?? `${studentId}@student.ruts.ac.th`;
+      role = 'student';
+      passwordRaw = studentId;
+
+      const dupStudentId = await this.db.queryOne<{ id: string }>(
+        `SELECT id FROM users WHERE student_id = $1`,
+        [studentId],
+      );
+      if (dupStudentId) throw new ConflictException('รหัสนักศึกษานี้มีในระบบแล้ว');
+
+    } else if (dto.patientType === 'staff_member') {
+      // ── บุคลากร ──────────────────────────────────────────────────────────
+      studentId = dto.studentId ?? null; // optional employee ID
+      email = dto.email ?? `staff-${id.slice(0, 8)}@ruts.ac.th`;
+      role = 'staff';
+      passwordRaw = dto.phone ?? id.slice(0, 8); // phone or random as initial password
+
+    } else {
+      // ── บุคคลภายนอก ──────────────────────────────────────────────────────
+      email = dto.email ?? `ext-${id.slice(0, 8)}@guest.ruts.ac.th`;
+      role = 'student'; // treated as patient in the system
+      passwordRaw = id.slice(0, 8); // random password (they won't log in)
+    }
 
     // Check for duplicate email
     const dupEmail = await this.db.queryOne<{ id: string }>(
@@ -631,14 +655,18 @@ export class VisitsService {
     );
     if (dupEmail) throw new ConflictException('อีเมลนี้มีในระบบแล้ว');
 
-    const passwordHash = await bcrypt.hash(dto.studentId, 12);
-    const id = randomUUID();
+    const passwordHash = await bcrypt.hash(passwordRaw, 12);
 
     await this.db.query(
-      `INSERT INTO users (id, student_id, email, password_hash, first_name, last_name, phone, role, title, faculty, department, year_of_study, birth_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'student', $8, $9, $10, $11, $12)`,
-      [id, dto.studentId, email, passwordHash, dto.firstName, dto.lastName, dto.phone ?? null,
-       dto.title, dto.faculty ?? null, dto.department ?? null, dto.yearOfStudy ?? null, dto.birthDate ?? null],
+      `INSERT INTO users (id, student_id, email, password_hash, first_name, last_name, phone, role, title,
+                          faculty, department, year_of_study, birth_date, national_id, position)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::user_role, $9, $10, $11, $12, $13, $14, $15)`,
+      [
+        id, studentId, email, passwordHash,
+        dto.firstName, dto.lastName, dto.phone ?? null, role, dto.title,
+        dto.faculty ?? null, dto.department ?? null, dto.yearOfStudy ?? null,
+        dto.birthDate ?? null, dto.nationalId ?? null, dto.position ?? null,
+      ],
     );
 
     // Create empty health profile so joins don't fail
@@ -647,6 +675,6 @@ export class VisitsService {
       [id],
     );
 
-    return { id, firstName: dto.firstName, lastName: dto.lastName, studentId: dto.studentId, email, role: 'student' };
+    return { id, firstName: dto.firstName, lastName: dto.lastName, studentId, email, role };
   }
 }
