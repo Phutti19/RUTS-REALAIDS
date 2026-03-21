@@ -14,6 +14,7 @@ import { UpdateSlotDto } from './dto/update-slot.dto';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { ListAppointmentsDto } from './dto/list-appointments.dto';
 import { CancelAppointmentDto } from './dto/cancel-appointment.dto';
+import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 import {
   SlotRow,
   SlotDetailRow,
@@ -306,6 +307,7 @@ export class AppointmentsService {
     });
 
     const created = await this.getAppointmentDetailRow(appointment);
+    const formatted = this.formatAppointment(created!);
 
     // Real-time notification to the staff member
     this.ws.notifyUser(slot.staff_id, {
@@ -316,8 +318,11 @@ export class AppointmentsService {
       referenceId: appointment,
     });
 
+    // Broadcast appointment update for real-time UI refresh
+    this.ws.notifyAppointmentUpdate({ action: 'created', appointment: formatted }, patientId);
+
     this.logger.log(`Appointment created: ${appointment} patient=${patientId} slot=${dto.slotId} date=${dto.date}`);
-    return this.formatAppointment(created!);
+    return formatted;
   }
 
   async listAppointments(
@@ -462,8 +467,8 @@ export class AppointmentsService {
   }
 
   async cancel(id: string, callerId: string, callerRole: string, dto: CancelAppointmentDto): Promise<Appointment> {
-    const row = await this.db.queryOne<{ id: string; patient_id: string; status: string }>(
-      `SELECT id, patient_id, status FROM appointments WHERE id = $1`,
+    const row = await this.db.queryOne<{ id: string; patient_id: string; staff_id: string; status: string; appointment_date: string; appointment_time: string }>(
+      `SELECT id, patient_id, staff_id, status, appointment_date::text, appointment_time FROM appointments WHERE id = $1`,
       [id],
     );
     if (!row) throw new NotFoundException(`Appointment '${id}' not found.`);
@@ -476,17 +481,125 @@ export class AppointmentsService {
       throw new BadRequestException(`Cannot cancel an appointment with status '${row.status}'.`);
     }
 
-    const updated = await this.db.queryOne<AppointmentDetailRow>(
+    await this.db.execute(
       `UPDATE appointments
        SET status = 'cancelled', cancel_reason = $2, updated_at = NOW()
-       WHERE id = $1
-       RETURNING id`,
+       WHERE id = $1`,
       [id, dto.cancelReason],
     );
 
+    // Notify the other party (staff cancels → notify patient, patient cancels → notify staff)
+    const notifyUserId = callerRole === 'student' ? row.staff_id : row.patient_id;
+    const notifyTitle = callerRole === 'student' ? 'ผู้ป่วยยกเลิกนัดหมาย' : 'นัดหมายถูกยกเลิก';
+    const notifyMsg = `นัดหมายวันที่ ${row.appointment_date} เวลา ${row.appointment_time.slice(0, 5)} ถูกยกเลิก เหตุผล: ${dto.cancelReason}`;
+
+    await this.db.execute(
+      `INSERT INTO notifications (user_id, type, title, message, reference_type, reference_id)
+       VALUES ($1, 'appointment', $2, $3, 'appointment', $4)`,
+      [notifyUserId, notifyTitle, notifyMsg, id],
+    );
+    this.ws.notifyUser(notifyUserId, {
+      type: 'appointment',
+      title: notifyTitle,
+      message: notifyMsg,
+      referenceType: 'appointment',
+      referenceId: id,
+    });
+
     this.logger.log(`Appointment cancelled: ${id} by ${callerId}`);
-    const detail = await this.getAppointmentDetailRow(updated!.id);
-    return this.formatAppointment(detail!);
+    const detail = await this.getAppointmentDetailRow(id);
+    const formatted = this.formatAppointment(detail!);
+
+    // Broadcast for real-time UI refresh
+    this.ws.notifyAppointmentUpdate({ action: 'cancelled', appointment: formatted }, row.patient_id);
+
+    return formatted;
+  }
+
+  /**
+   * Reschedule an appointment to a new slot/date.
+   * Only staff/admin can reschedule. Status must be 'scheduled'.
+   * Validates the new slot just like createAppointment.
+   */
+  async reschedule(id: string, callerId: string, dto: RescheduleAppointmentDto): Promise<Appointment> {
+    const row = await this.db.queryOne<{ id: string; patient_id: string; status: string }>(
+      `SELECT id, patient_id, status FROM appointments WHERE id = $1`,
+      [id],
+    );
+    if (!row) throw new NotFoundException(`Appointment '${id}' not found.`);
+
+    if (row.status !== 'scheduled') {
+      throw new BadRequestException(`Cannot reschedule an appointment with status '${row.status}'.`);
+    }
+
+    // Validate new slot
+    const slot = await this.db.queryOne<SlotRow>(
+      `SELECT * FROM appointment_slots WHERE id = $1 AND is_active = true`,
+      [dto.slotId],
+    );
+    if (!slot) throw new NotFoundException(`Appointment slot '${dto.slotId}' not found or inactive.`);
+
+    // Validate date matches slot's day_of_week
+    const bookDate = new Date(dto.date);
+    if (isNaN(bookDate.getTime())) {
+      throw new BadRequestException('Invalid date format. Use YYYY-MM-DD.');
+    }
+    if (bookDate.getDay() !== slot.day_of_week) {
+      throw new BadRequestException(
+        `Slot is only available on ${DAY_NAMES[slot.day_of_week]}. Chosen date falls on ${DAY_NAMES[bookDate.getDay()]}.`,
+      );
+    }
+
+    // Prevent past dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (bookDate < today) {
+      throw new BadRequestException('Cannot reschedule to a past date.');
+    }
+
+    // Check capacity (exclude current appointment from count)
+    const capacityRow = await this.db.queryOne<{ booked_count: string }>(
+      `SELECT COUNT(*)::text AS booked_count FROM appointments
+       WHERE slot_id = $1 AND appointment_date = $2 AND status NOT IN ('cancelled', 'no_show') AND id != $3`,
+      [dto.slotId, dto.date, id],
+    );
+    const bookedCount = parseInt(capacityRow?.booked_count ?? '0', 10);
+    if (bookedCount >= slot.max_patients_per_slot) {
+      throw new ConflictException('This appointment slot is fully booked for the selected date.');
+    }
+
+    // Update appointment
+    await this.db.execute(
+      `UPDATE appointments
+       SET slot_id = $2, staff_id = $3, appointment_date = $4, appointment_time = $5, updated_at = NOW()
+       WHERE id = $1`,
+      [id, dto.slotId, slot.staff_id, dto.date, slot.start_time],
+    );
+
+    // Notify patient
+    const reasonPart = dto.reason ? ` เหตุผล: ${dto.reason}` : '';
+    const notifyMsg = `นัดหมายของคุณถูกเลื่อนเป็นวันที่ ${dto.date} เวลา ${slot.start_time.slice(0, 5)} น.${reasonPart}`;
+    await this.db.execute(
+      `INSERT INTO notifications (user_id, type, title, message, reference_type, reference_id)
+       VALUES ($1, 'appointment', $2, $3, 'appointment', $4)`,
+      [row.patient_id, 'นัดหมายถูกเลื่อน', notifyMsg, id],
+    );
+    this.ws.notifyUser(row.patient_id, {
+      type: 'appointment',
+      title: 'นัดหมายถูกเลื่อน',
+      message: notifyMsg,
+      referenceType: 'appointment',
+      referenceId: id,
+    });
+
+    this.logger.log(`Appointment rescheduled: ${id} → slot=${dto.slotId} date=${dto.date} by ${callerId}`);
+    const detail = await this.getAppointmentDetailRow(id);
+    const formatted = this.formatAppointment(detail!);
+
+    // Broadcast for real-time UI refresh
+    this.ws.notifyAppointmentUpdate({ action: 'rescheduled', appointment: formatted }, row.patient_id);
+
+    return formatted;
   }
 
   async noShow(id: string): Promise<Appointment> {
@@ -515,8 +628,8 @@ export class AppointmentsService {
     newStatus: string,
     allowedFrom: string[],
   ): Promise<Appointment> {
-    const row = await this.db.queryOne<{ id: string; status: string }>(
-      `SELECT id, status FROM appointments WHERE id = $1`,
+    const row = await this.db.queryOne<{ id: string; patient_id: string; status: string }>(
+      `SELECT id, patient_id, status FROM appointments WHERE id = $1`,
       [id],
     );
     if (!row) throw new NotFoundException(`Appointment '${id}' not found.`);
@@ -534,7 +647,12 @@ export class AppointmentsService {
 
     this.logger.log(`Appointment ${id}: ${row.status} → ${newStatus}`);
     const detail = await this.getAppointmentDetailRow(id);
-    return this.formatAppointment(detail!);
+    const formatted = this.formatAppointment(detail!);
+
+    // Broadcast for real-time UI refresh
+    this.ws.notifyAppointmentUpdate({ action: newStatus, appointment: formatted }, row.patient_id);
+
+    return formatted;
   }
 
   private async getAppointmentDetailRow(id: string): Promise<AppointmentDetailRow | null> {

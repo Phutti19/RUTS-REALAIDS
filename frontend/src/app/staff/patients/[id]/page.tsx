@@ -63,6 +63,8 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
   const [illnessHistory, setIllnessHistory] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
   const [treatment, setTreatment] = useState("");
+  const [treatmentTypeId, setTreatmentTypeId] = useState("");
+  const [treatmentTypes, setTreatmentTypes] = useState<{ id: string; name: string }[]>([]);
   const [woundCare, setWoundCare] = useState(false);
   const [restHours, setRestHours] = useState("");
   const [consultationTypes, setConsultationTypes] = useState<string[]>([]);
@@ -84,11 +86,16 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
   const [completing, setCompleting] = useState(false);
 
   const loadVisit = useCallback(async () => {
-    const [visitRes, medsRes, meds2Res] = await Promise.all([
+    const [visitRes, medsRes, meds2Res, ttRes] = await Promise.all([
       api.get<VisitDetail>(`/visits/${id}`),
       api.get<Medicine[]>("/medicines?limit=200"),
       api.get<VisitMedication[]>(`/visits/${id}/medications`),
+      api.get<{ id: string; name: string; isActive: boolean }[]>("/admin/treatment-types"),
     ]);
+
+    if (ttRes.success && Array.isArray(ttRes.data)) {
+      setTreatmentTypes(ttRes.data.filter((t) => t.isActive));
+    }
 
     if (visitRes.success && visitRes.data) {
       const v = visitRes.data;
@@ -98,6 +105,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
       setTreatment(v.treatmentNotes ?? "");
       setIllnessHistory(v.illnessHistory ?? "");
       setVitalSigns(v.vitalSigns ?? {});
+      setTreatmentTypeId(v.treatmentTypeId ?? "");
       setWoundCare(v.woundCare ?? false);
       setRestHours(v.restHours != null ? String(v.restHours) : "");
       setConsultationTypes(v.consultationTypes ?? []);
@@ -176,6 +184,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
     setSavingVisit(true); setVisitMsg(null);
     const res = await api.patch(`/visits/${id}`, {
       diagnosis, treatmentNotes: treatment, illnessHistory, vitalSigns,
+      treatmentTypeId: treatmentTypeId || null,
       woundCare, restHours: restHours ? parseFloat(restHours) : null,
       consultationTypes, isReferred,
     });
@@ -267,7 +276,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
         {isDone && (
           <Link href={`/staff/patients/${id}/certificate`}
             className="flex items-center gap-2 px-5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-base font-semibold border border-blue-200">
-            <Printer size={16} /> ใบรับรองแพทย์
+            <Printer size={16} /> ใบรับรองห้องพยาบาล
           </Link>
         )}
       </div>
@@ -436,6 +445,27 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
                 {isActive
                   ? <textarea value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} rows={3} placeholder="ระบุการวินิจฉัย..." className="fi w-full resize-none" />
                   : <p className="bg-gray-50 rounded-xl px-4 py-3 text-base text-gray-700 min-h-[48px]">{diagnosis || "—"}</p>}
+              </div>
+
+              {/* Treatment type */}
+              <div>
+                <p className="text-sm text-gray-400 mb-1.5">ประเภทการรักษา</p>
+                {isActive ? (
+                  <select
+                    value={treatmentTypeId}
+                    onChange={(e) => setTreatmentTypeId(e.target.value)}
+                    className="fi w-full"
+                  >
+                    <option value="">-- เลือกประเภทการรักษา --</option>
+                    {treatmentTypes.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="bg-gray-50 rounded-xl px-4 py-3 text-base text-gray-700 min-h-[48px]">
+                    {treatmentTypes.find((t) => t.id === treatmentTypeId)?.name || "—"}
+                  </p>
+                )}
               </div>
 
               {/* Treatment */}

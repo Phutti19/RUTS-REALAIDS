@@ -30,7 +30,7 @@ export interface AppointmentRow {
   slot_id: string;
   appointment_date: string; // DATE column → string in ISO format "YYYY-MM-DD"
   appointment_time: string; // TIME column → e.g. "09:00:00"
-  reason: string | null;
+  reason: string;
   status: string;
   cancel_reason: string | null;
   notes: string | null;
@@ -82,7 +82,7 @@ export interface Appointment {
   slotId: string;
   appointmentDate: string;
   appointmentTime: string;
-  reason: string | null;
+  reason: string;
   status: string;
   cancelReason: string | null;
   notes: string | null;

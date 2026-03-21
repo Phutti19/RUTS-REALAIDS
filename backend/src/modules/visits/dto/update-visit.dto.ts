@@ -7,6 +7,7 @@ import {
   IsBoolean,
   IsArray,
   IsNumber,
+  IsUUID,
   Min,
   Max,
   ValidateNested,
@@ -57,6 +58,10 @@ export class UpdateVisitDto {
   @IsOptional()
   @IsBoolean()
   isReferred?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  treatmentTypeId?: string | null;
 
   @IsOptional()
   @IsEnum(['waiting', 'in_treatment', 'completed', 'referred'], {

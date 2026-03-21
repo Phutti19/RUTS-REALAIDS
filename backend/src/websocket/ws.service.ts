@@ -39,6 +39,8 @@ export const WS_EVENTS = {
   NOTIFICATION_NEW: 'notification:new',
   // Stock events
   STOCK_ALERT: 'stock:alert',
+  // Appointment events
+  APPOINTMENT_UPDATE: 'appointment:update',
 } as const;
 
 // ── Service ───────────────────────────────────────────────────────────────────
@@ -71,6 +73,14 @@ export class WsService {
   // ── Connection handling ─────────────────────────────────────────────────
 
   private handleConnection(ws: WebSocket, req: http.IncomingMessage): void {
+    // Validate origin
+    const origin = req.headers.origin;
+    const allowedOrigins = (process.env.CORS_ORIGIN ?? '').split(',').map((o) => o.trim()).filter(Boolean);
+    if (allowedOrigins.length > 0 && origin && !allowedOrigins.some((o) => origin.startsWith(o))) {
+      ws.close(1008, 'Origin not allowed');
+      return;
+    }
+
     // Extract JWT from ?token= query param
     const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
     const token = url.searchParams.get('token');
@@ -80,9 +90,15 @@ export class WsService {
       return;
     }
 
+    if (!process.env.JWT_SECRET) {
+      this.logger.error('JWT_SECRET is not configured');
+      ws.close(1011, 'Server misconfigured');
+      return;
+    }
+
     let payload: JwtPayload;
     try {
-      payload = jwt.verify(token, process.env.JWT_SECRET ?? '') as JwtPayload;
+      payload = jwt.verify(token, process.env.JWT_SECRET) as JwtPayload;
     } catch {
       ws.close(1008, 'Invalid or expired token');
       return;
@@ -202,6 +218,12 @@ export class WsService {
   /** Medicine stock below threshold — notify all staff. */
   notifyStockAlert(stockData: unknown): void {
     this.broadcastToStaff(WS_EVENTS.STOCK_ALERT, stockData);
+  }
+
+  /** Appointment created/updated/cancelled/rescheduled — notify all staff + patient. */
+  notifyAppointmentUpdate(appointmentData: unknown, patientId: string): void {
+    this.broadcastToStaff(WS_EVENTS.APPOINTMENT_UPDATE, appointmentData);
+    this.sendToUser(patientId, WS_EVENTS.APPOINTMENT_UPDATE, appointmentData);
   }
 
   // ── Stats ───────────────────────────────────────────────────────────────

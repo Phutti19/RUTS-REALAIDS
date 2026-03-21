@@ -6,6 +6,7 @@ import {
   CheckCircle2, Shield, Phone, Plus, Trash2, AlertCircle,
   UserCheck, UserX, X, Search, ChevronLeft, ChevronRight, KeyRound,
   FileText, Activity, ShieldAlert, Megaphone, ToggleLeft, ToggleRight, Send,
+  GraduationCap, Building2, Pencil, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { usePushNotification } from "@/hooks/usePushNotification";
@@ -14,7 +15,7 @@ import { cn } from "@/lib/utils";
 import type { SystemSetting, EmergencyContact } from "@/types";
 
 type TabType = "profile" | "notifications" | "contacts" | "users" | "system" | "backup"
-  | "audit" | "treatments" | "security" | "broadcast";
+  | "audit" | "treatments" | "faculties" | "security" | "broadcast";
 
 export default function SettingsPage() {
   const { user } = useAuthContext();
@@ -27,6 +28,7 @@ export default function SettingsPage() {
     { key: "contacts", label: "สมุดโทรศัพท์", icon: <Phone size={16} /> },
     { key: "users", label: "ผู้ใช้งาน", icon: <Users size={16} />, adminOnly: true },
     { key: "treatments", label: "ประเภทการรักษา", icon: <Activity size={16} />, adminOnly: true },
+    { key: "faculties", label: "คณะ/สาขา", icon: <GraduationCap size={16} />, adminOnly: true },
     { key: "audit", label: "ประวัติการใช้งาน", icon: <FileText size={16} />, adminOnly: true },
     { key: "security", label: "ความปลอดภัย", icon: <ShieldAlert size={16} />, adminOnly: true },
     { key: "broadcast", label: "ประกาศ", icon: <Megaphone size={16} />, adminOnly: true },
@@ -71,6 +73,7 @@ export default function SettingsPage() {
           {tab === "contacts" && <ContactsTab />}
           {tab === "users" && isAdmin && <UsersTab />}
           {tab === "treatments" && isAdmin && <TreatmentTypesTab />}
+          {tab === "faculties" && isAdmin && <FacultiesTab />}
           {tab === "audit" && isAdmin && <AuditLogsTab />}
           {tab === "security" && isAdmin && <SecurityTab />}
           {tab === "broadcast" && isAdmin && <BroadcastTab />}
@@ -901,6 +904,7 @@ function TreatmentTypesTab() {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const fetchTypes = useCallback(() => {
@@ -931,6 +935,19 @@ function TreatmentTypesTab() {
     const res = await api.patch(`/admin/treatment-types/${id}/toggle`);
     setTogglingId(null);
     if (res.success) fetchTypes();
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`ต้องการลบ "${name}" หรือไม่?`)) return;
+    setDeletingId(id);
+    setError("");
+    const res = await api.delete(`/admin/treatment-types/${id}`);
+    setDeletingId(null);
+    if (res.success) {
+      fetchTypes();
+    } else {
+      setError(res.message ?? "ไม่สามารถลบได้");
+    }
   };
 
   return (
@@ -982,21 +999,389 @@ function TreatmentTypesTab() {
                   {t.name}
                 </span>
               </div>
-              <button
-                onClick={() => handleToggle(t.id)}
-                disabled={togglingId === t.id}
-                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                {togglingId === t.id ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : t.isActive ? (
-                  <ToggleRight size={20} className="text-green-600" />
-                ) : (
-                  <ToggleLeft size={20} className="text-gray-400" />
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleToggle(t.id)}
+                  disabled={togglingId === t.id}
+                  className="flex items-center text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  {togglingId === t.id ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : t.isActive ? (
+                    <ToggleRight size={20} className="text-green-600" />
+                  ) : (
+                    <ToggleLeft size={20} className="text-gray-400" />
+                  )}
+                </button>
+                <button
+                  onClick={() => handleDelete(t.id, t.name)}
+                  disabled={deletingId === t.id}
+                  className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                >
+                  {deletingId === t.id ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={14} />
+                  )}
+                </button>
+              </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Faculties & Departments Tab ───────────────────────────────────────────────
+
+interface FacultyItem {
+  id: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+  departments?: DepartmentItem[];
+}
+
+interface DepartmentItem {
+  id: string;
+  facultyId: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+function FacultiesTab() {
+  const [faculties, setFaculties] = useState<FacultyItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Add faculty
+  const [newFacultyName, setNewFacultyName] = useState("");
+  const [savingFaculty, setSavingFaculty] = useState(false);
+
+  // Add department
+  const [deptFacultyId, setDeptFacultyId] = useState<string | null>(null);
+  const [newDeptName, setNewDeptName] = useState("");
+  const [savingDept, setSavingDept] = useState(false);
+
+  // Expand/collapse
+  const [expandedFaculty, setExpandedFaculty] = useState<string | null>(null);
+
+  // Edit inline
+  const [editingFaculty, setEditingFaculty] = useState<{ id: string; name: string } | null>(null);
+  const [editingDept, setEditingDept] = useState<{ id: string; name: string } | null>(null);
+
+  // Loading states
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fetchFaculties = useCallback(() => {
+    api.get<FacultyItem[]>("/admin/faculties").then((res) => {
+      if (res.success && res.data) setFaculties(res.data);
+      setLoading(false);
+    });
+  }, []);
+
+  useEffect(() => { fetchFaculties(); }, [fetchFaculties]);
+
+  const handleCreateFaculty = async () => {
+    if (!newFacultyName.trim()) return;
+    setSavingFaculty(true);
+    setError("");
+    const res = await api.post("/admin/faculties", { name: newFacultyName.trim() });
+    setSavingFaculty(false);
+    if (res.success) {
+      setNewFacultyName("");
+      fetchFaculties();
+    } else {
+      setError(res.message ?? "เกิดข้อผิดพลาด");
+    }
+  };
+
+  const handleUpdateFaculty = async () => {
+    if (!editingFaculty || !editingFaculty.name.trim()) return;
+    setError("");
+    const res = await api.put(`/admin/faculties/${editingFaculty.id}`, { name: editingFaculty.name.trim() });
+    if (res.success) {
+      setEditingFaculty(null);
+      fetchFaculties();
+    } else {
+      setError(res.message ?? "เกิดข้อผิดพลาด");
+    }
+  };
+
+  const handleToggleFaculty = async (id: string) => {
+    setTogglingId(id);
+    await api.patch(`/admin/faculties/${id}/toggle`);
+    setTogglingId(null);
+    fetchFaculties();
+  };
+
+  const handleDeleteFaculty = async (id: string, name: string) => {
+    if (!confirm(`ต้องการลบคณะ "${name}" และสาขาทั้งหมดในคณะนี้?`)) return;
+    setDeletingId(id);
+    setError("");
+    const res = await api.delete(`/admin/faculties/${id}`);
+    setDeletingId(null);
+    if (res.success) {
+      fetchFaculties();
+    } else {
+      setError(res.message ?? "ไม่สามารถลบได้");
+    }
+  };
+
+  const handleCreateDept = async () => {
+    if (!deptFacultyId || !newDeptName.trim()) return;
+    setSavingDept(true);
+    setError("");
+    const res = await api.post("/admin/faculties/departments", {
+      facultyId: deptFacultyId,
+      name: newDeptName.trim(),
+    });
+    setSavingDept(false);
+    if (res.success) {
+      setNewDeptName("");
+      fetchFaculties();
+    } else {
+      setError(res.message ?? "เกิดข้อผิดพลาด");
+    }
+  };
+
+  const handleUpdateDept = async () => {
+    if (!editingDept || !editingDept.name.trim()) return;
+    setError("");
+    const res = await api.put(`/admin/faculties/departments/${editingDept.id}`, { name: editingDept.name.trim() });
+    if (res.success) {
+      setEditingDept(null);
+      fetchFaculties();
+    } else {
+      setError(res.message ?? "เกิดข้อผิดพลาด");
+    }
+  };
+
+  const handleToggleDept = async (id: string) => {
+    setTogglingId(id);
+    await api.patch(`/admin/faculties/departments/${id}/toggle`);
+    setTogglingId(null);
+    fetchFaculties();
+  };
+
+  const handleDeleteDept = async (id: string, name: string) => {
+    if (!confirm(`ต้องการลบสาขา "${name}"?`)) return;
+    setDeletingId(id);
+    setError("");
+    const res = await api.delete(`/admin/faculties/departments/${id}`);
+    setDeletingId(null);
+    if (res.success) {
+      fetchFaculties();
+    } else {
+      setError(res.message ?? "ไม่สามารถลบได้");
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="font-semibold text-gray-800">จัดการคณะ/สาขา</h2>
+        <p className="text-sm text-gray-500 mt-1">เพิ่ม แก้ไข หรือลบคณะและสาขาวิชาที่ใช้ในระบบ</p>
+      </div>
+
+      {/* Add faculty form */}
+      <div className="flex gap-2">
+        <input
+          value={newFacultyName}
+          onChange={(e) => setNewFacultyName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleCreateFaculty()}
+          placeholder="ชื่อคณะใหม่..."
+          className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <button
+          onClick={handleCreateFaculty}
+          disabled={savingFaculty || !newFacultyName.trim()}
+          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-sm font-semibold transition-colors"
+        >
+          {savingFaculty ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          เพิ่มคณะ
+        </button>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-xl px-3 py-2">
+          <AlertCircle size={14} /> {error}
+        </div>
+      )}
+
+      {/* Faculty list */}
+      {loading ? (
+        <Loader2 size={20} className="animate-spin text-gray-300" />
+      ) : faculties.length === 0 ? (
+        <p className="text-sm text-gray-400">ยังไม่มีข้อมูลคณะ</p>
+      ) : (
+        <div className="space-y-2">
+          {faculties.map((f) => {
+            const isExpanded = expandedFaculty === f.id;
+            const depts = f.departments ?? [];
+
+            return (
+              <div key={f.id} className="border border-gray-100 rounded-xl overflow-hidden">
+                {/* Faculty header */}
+                <div className="flex items-center gap-2 p-3 bg-gray-50/50">
+                  <button
+                    onClick={() => setExpandedFaculty(isExpanded ? null : f.id)}
+                    className="p-0.5 text-gray-400 hover:text-gray-600"
+                  >
+                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+
+                  <Building2 size={16} className={f.isActive ? "text-blue-500" : "text-gray-300"} />
+
+                  {editingFaculty?.id === f.id ? (
+                    <div className="flex-1 flex items-center gap-2">
+                      <input
+                        value={editingFaculty.name}
+                        onChange={(e) => setEditingFaculty({ ...editingFaculty, name: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleUpdateFaculty();
+                          if (e.key === "Escape") setEditingFaculty(null);
+                        }}
+                        className="flex-1 px-2 py-1 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        autoFocus
+                      />
+                      <button onClick={handleUpdateFaculty} className="text-xs text-blue-600 font-semibold">บันทึก</button>
+                      <button onClick={() => setEditingFaculty(null)} className="text-xs text-gray-400">ยกเลิก</button>
+                    </div>
+                  ) : (
+                    <span
+                      className={cn("flex-1 text-sm font-medium", f.isActive ? "text-gray-700" : "text-gray-400 line-through")}
+                    >
+                      {f.name}
+                      <span className="text-xs text-gray-400 ml-2">({depts.length} สาขา)</span>
+                    </span>
+                  )}
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setEditingFaculty({ id: f.id, name: f.name })}
+                      className="p-1 text-gray-300 hover:text-blue-500 transition-colors"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      onClick={() => handleToggleFaculty(f.id)}
+                      disabled={togglingId === f.id}
+                      className="flex items-center text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      {togglingId === f.id ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : f.isActive ? (
+                        <ToggleRight size={20} className="text-green-600" />
+                      ) : (
+                        <ToggleLeft size={20} className="text-gray-400" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteFaculty(f.id, f.name)}
+                      disabled={deletingId === f.id}
+                      className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                    >
+                      {deletingId === f.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Departments (expanded) */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100 bg-white px-3 py-2 space-y-1.5">
+                    {depts.length === 0 && (
+                      <p className="text-xs text-gray-400 py-1 pl-6">ยังไม่มีสาขาในคณะนี้</p>
+                    )}
+                    {depts.map((d) => (
+                      <div key={d.id} className="flex items-center gap-2 pl-6 py-1.5">
+                        <span className={cn("w-1.5 h-1.5 rounded-full", d.isActive ? "bg-green-500" : "bg-gray-300")} />
+
+                        {editingDept?.id === d.id ? (
+                          <div className="flex-1 flex items-center gap-2">
+                            <input
+                              value={editingDept.name}
+                              onChange={(e) => setEditingDept({ ...editingDept, name: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleUpdateDept();
+                                if (e.key === "Escape") setEditingDept(null);
+                              }}
+                              className="flex-1 px-2 py-0.5 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                              autoFocus
+                            />
+                            <button onClick={handleUpdateDept} className="text-xs text-blue-600 font-semibold">บันทึก</button>
+                            <button onClick={() => setEditingDept(null)} className="text-xs text-gray-400">ยกเลิก</button>
+                          </div>
+                        ) : (
+                          <span className={cn("flex-1 text-sm", d.isActive ? "text-gray-600" : "text-gray-400 line-through")}>
+                            {d.name}
+                          </span>
+                        )}
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setEditingDept({ id: d.id, name: d.name })}
+                            className="p-0.5 text-gray-300 hover:text-blue-500 transition-colors"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            onClick={() => handleToggleDept(d.id)}
+                            disabled={togglingId === d.id}
+                            className="flex items-center"
+                          >
+                            {togglingId === d.id ? (
+                              <Loader2 size={12} className="animate-spin text-gray-400" />
+                            ) : d.isActive ? (
+                              <ToggleRight size={18} className="text-green-600" />
+                            ) : (
+                              <ToggleLeft size={18} className="text-gray-400" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDept(d.id, d.name)}
+                            disabled={deletingId === d.id}
+                            className="p-0.5 text-gray-300 hover:text-red-500 transition-colors"
+                          >
+                            {deletingId === d.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Add department form */}
+                    <div className="flex gap-2 pl-6 pt-1">
+                      <input
+                        value={deptFacultyId === f.id ? newDeptName : ""}
+                        onChange={(e) => {
+                          setDeptFacultyId(f.id);
+                          setNewDeptName(e.target.value);
+                        }}
+                        onFocus={() => setDeptFacultyId(f.id)}
+                        onKeyDown={(e) => e.key === "Enter" && handleCreateDept()}
+                        placeholder="เพิ่มสาขาใหม่..."
+                        className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                      <button
+                        onClick={() => {
+                          setDeptFacultyId(f.id);
+                          handleCreateDept();
+                        }}
+                        disabled={savingDept || !newDeptName.trim() || deptFacultyId !== f.id}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        {savingDept && deptFacultyId === f.id ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                        เพิ่ม
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

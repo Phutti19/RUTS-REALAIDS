@@ -27,8 +27,10 @@ export class EmergencyContactsController {
   /**
    * GET /api/v1/emergency-contacts
    * List all emergency contacts ordered by category then name.
+   * Students can also read emergency contacts (read-only).
    */
   @Get()
+  @Roles('student', 'staff', 'admin')
   async listContacts() {
     const data = await this.settingsService.listContacts();
     return { success: true, data };

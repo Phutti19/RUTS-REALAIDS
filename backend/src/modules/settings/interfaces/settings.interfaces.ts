@@ -145,6 +145,45 @@ export interface TreatmentType {
   createdAt: Date;
 }
 
+// ── Faculties & Departments ──────────────────────────────────────────────────
+
+export interface FacultyRow {
+  id: string;
+  name: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface Faculty {
+  id: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: Date;
+  departments?: Department[];
+}
+
+export interface DepartmentRow {
+  id: string;
+  faculty_id: string;
+  name: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface Department {
+  id: string;
+  facultyId: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: Date;
+}
+
 // ── Login Attempts ───────────────────────────────────────────────────────────
 
 export interface LoginAttemptRow {

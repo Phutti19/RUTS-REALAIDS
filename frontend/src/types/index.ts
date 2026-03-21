@@ -95,7 +95,9 @@ export interface IncidentImage {
   id: string;
   incidentId: string;
   imageUrl: string;
-  createdAt: string;
+  caption: string | null;
+  sortOrder: number;
+  uploadedAt: string;
 }
 
 export interface IncidentStatusLog {
@@ -139,6 +141,7 @@ export interface Visit {
   restHours: number | null;
   consultationTypes: string[];
   isReferred: boolean;
+  treatmentTypeId: string | null;
   status: VisitStatus;
   /** Nested patient info returned by backend */
   patient: {

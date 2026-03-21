@@ -9,6 +9,7 @@ export interface NotificationRow {
   reference_type: string | null;
   reference_id: string | null;
   is_read: boolean;
+  read_at: Date | null;
   created_at: Date;
 }
 
@@ -18,6 +19,8 @@ export interface PushSubscriptionRow {
   endpoint: string;
   p256dh_key: string;
   auth_key: string;
+  device_info: string | null;
+  is_active: boolean;
   created_at: Date;
 }
 
@@ -32,6 +35,7 @@ export interface Notification {
   referenceType: string | null;
   referenceId: string | null;
   isRead: boolean;
+  readAt: Date | null;
   createdAt: Date;
 }
 

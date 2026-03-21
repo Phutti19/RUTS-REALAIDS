@@ -175,7 +175,7 @@ export class NotificationsService implements OnModuleInit {
     if (existing.user_id !== userId) throw new ForbiddenException('Access denied.');
 
     const updated = await this.db.queryOne<NotificationRow>(
-      `UPDATE notifications SET is_read = true WHERE id = $1 RETURNING *`,
+      `UPDATE notifications SET is_read = true, read_at = NOW() WHERE id = $1 RETURNING *`,
       [id],
     );
     return this.formatNotification(updated!);
@@ -183,7 +183,7 @@ export class NotificationsService implements OnModuleInit {
 
   async markAllAsRead(userId: string): Promise<{ updated: number }> {
     const count = await this.db.execute(
-      `UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false`,
+      `UPDATE notifications SET is_read = true, read_at = NOW() WHERE user_id = $1 AND is_read = false`,
       [userId],
     );
     return { updated: count };
@@ -208,14 +208,16 @@ export class NotificationsService implements OnModuleInit {
    */
   async subscribe(userId: string, dto: SubscribePushDto): Promise<PushSubscriptionInfo> {
     const row = await this.db.queryOne<PushSubscriptionRow>(
-      `INSERT INTO push_subscriptions (user_id, endpoint, p256dh_key, auth_key)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO push_subscriptions (user_id, endpoint, p256dh_key, auth_key, device_info, is_active)
+       VALUES ($1, $2, $3, $4, $5, true)
        ON CONFLICT (endpoint) DO UPDATE
          SET user_id     = EXCLUDED.user_id,
              p256dh_key  = EXCLUDED.p256dh_key,
-             auth_key    = EXCLUDED.auth_key
+             auth_key    = EXCLUDED.auth_key,
+             device_info = EXCLUDED.device_info,
+             is_active   = true
        RETURNING *`,
-      [userId, dto.endpoint, dto.p256dh, dto.auth],
+      [userId, dto.endpoint, dto.p256dh, dto.auth, dto.deviceInfo ?? null],
     );
 
     this.logger.log(`Push subscription saved: user=${userId}`);
@@ -344,6 +346,7 @@ export class NotificationsService implements OnModuleInit {
       referenceType: row.reference_type,
       referenceId: row.reference_id,
       isRead: row.is_read,
+      readAt: row.read_at,
       createdAt: row.created_at,
     };
   }

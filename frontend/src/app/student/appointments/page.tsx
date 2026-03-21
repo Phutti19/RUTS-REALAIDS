@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Calendar,
   ChevronRight,
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, formatDate, formatDateTime, statusLabel } from "@/lib/utils";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import type { Appointment, AppointmentSlot } from "@/types";
 
 const DAY_TH: Record<string, string> = {
@@ -225,14 +226,22 @@ export default function StudentAppointmentsPage() {
   const [bookError, setBookError] = useState("");
   const [bookSuccess, setBookSuccess] = useState(false);
   const [detailApt, setDetailApt] = useState<Appointment | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
 
-  useEffect(() => {
+  const refreshMyAppointments = useCallback(() => {
     api.get<Appointment[]>("/appointments/my").then((res) => {
       if (res.success)
         setAppointments(Array.isArray(res.data) ? (res.data as unknown as Appointment[]) : []);
       setLoadingApts(false);
     });
   }, []);
+
+  useEffect(() => { refreshMyAppointments(); }, [refreshMyAppointments]);
+
+  // Real-time: refresh when appointment is updated (e.g. staff reschedules/cancels)
+  useWebSocket("appointment:update", refreshMyAppointments, [refreshMyAppointments]);
 
   useEffect(() => {
     if (!selectedDate) {
@@ -281,6 +290,17 @@ export default function StudentAppointmentsPage() {
     }
   };
 
+  const confirmCancel = async () => {
+    if (!cancelTarget || !cancelReason.trim()) return;
+    setCancelLoading(true);
+    const res = await api.patch(`/appointments/${cancelTarget.id}/cancel`, { cancelReason: cancelReason.trim() });
+    setCancelLoading(false);
+    if (res.success) {
+      setAppointments((prev) => prev.map((a) => (a.id === cancelTarget.id ? { ...a, status: "cancelled" as const, cancelReason: cancelReason.trim() } : a)));
+      setCancelTarget(null);
+    }
+  };
+
   const todayStr = new Date().toLocaleDateString("en-CA");
   const upcoming = appointments.filter(
     (a) => ["scheduled", "checked_in"].includes(a.status) && a.appointmentDate >= todayStr
@@ -301,9 +321,9 @@ export default function StudentAppointmentsPage() {
   return (
     <div className="bg-slate-100 dark:bg-gray-900 min-h-screen">
       {/* Header */}
-      <div className="bg-gradient-to-br from-blue-800 to-blue-950 px-5 pt-10 pb-5">
-        <h1 className="font-bold text-2xl text-white">การนัดหมาย</h1>
-        <p className="text-blue-200 text-sm mt-0.5">จองนัดพบห้องพยาบาล</p>
+      <div className="bg-gradient-to-br from-blue-800 to-blue-950 px-4 pb-4 student-header">
+        <h1 className="font-bold text-lg text-white">การนัดหมาย</h1>
+        <p className="text-blue-200 text-xs mt-0.5">จองนัดพบห้องพยาบาล</p>
       </div>
 
       {/* Tabs */}
@@ -317,7 +337,7 @@ export default function StudentAppointmentsPage() {
             key={key}
             onClick={() => setTab(key as typeof tab)}
             className={cn(
-              "flex-1 py-3.5 text-sm font-semibold border-b-2 transition-colors",
+              "flex-1 py-3 text-xs font-semibold border-b-2 transition-colors",
               tab === key
                 ? "border-blue-700 text-blue-700 dark:border-blue-400 dark:text-blue-400"
                 : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700"
@@ -328,7 +348,7 @@ export default function StudentAppointmentsPage() {
         ))}
       </div>
 
-      <div className="px-4 py-5">
+      <div className="px-3 py-4">
         {/* ── Upcoming ── */}
         {tab === "upcoming" && (
           <div className="space-y-3">
@@ -349,7 +369,8 @@ export default function StudentAppointmentsPage() {
               </div>
             ) : (
               upcoming.map((apt) => (
-                <AppointmentCard key={apt.id} apt={apt} onClick={() => setDetailApt(apt)} />
+                <AppointmentCard key={apt.id} apt={apt} onClick={() => setDetailApt(apt)}
+                  onCancel={apt.status === "scheduled" ? () => { setCancelTarget(apt); setCancelReason(""); } : undefined} />
               ))
             )}
           </div>
@@ -559,6 +580,46 @@ export default function StudentAppointmentsPage() {
       {detailApt && (
         <AppointmentDetailSheet apt={detailApt} onClose={() => setDetailApt(null)} />
       )}
+
+      {/* Cancel dialog */}
+      {cancelTarget && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setCancelTarget(null)} />
+          <div className="fixed inset-0 z-50 flex items-end justify-center">
+            <div className="bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl w-full max-w-md p-6 pb-8">
+              <div className="flex justify-center mb-3">
+                <div className="w-10 h-1 bg-gray-200 dark:bg-gray-600 rounded-full" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">ยกเลิกนัดหมาย</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                วันที่ {cancelTarget.appointmentDate} เวลา {cancelTarget.appointmentTime.slice(0, 5)} น.
+              </p>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+                เหตุผลในการยกเลิก <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="เช่น ไม่สะดวก, มีธุระ..."
+                rows={3}
+                maxLength={500}
+                className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none bg-gray-50 dark:bg-gray-700 dark:text-white"
+              />
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => setCancelTarget(null)}
+                  className="flex-1 py-3 rounded-xl text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                  ปิด
+                </button>
+                <button onClick={confirmCancel} disabled={!cancelReason.trim() || cancelLoading}
+                  className="flex-1 py-3 rounded-xl text-sm font-bold bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  {cancelLoading ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                  ยืนยันยกเลิก
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -639,11 +700,22 @@ function AppointmentDetailSheet({ apt, onClose }: { apt: Appointment; onClose: (
             {apt.notes && (
               <Row icon={<AlertCircle size={15} className="text-orange-400" />} label="หมายเหตุ" value={apt.notes} />
             )}
-            {apt.cancelReason && (
-              <Row icon={<XCircle size={15} className="text-red-400" />} label="เหตุผลยกเลิก" value={apt.cancelReason} />
-            )}
             <Row icon={<Clock size={15} className="text-gray-400" />} label="สร้างเมื่อ" value={formatDateTime(apt.createdAt)} />
           </div>
+
+          {apt.cancelReason && apt.status === "cancelled" && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 bg-red-100 dark:bg-red-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <XCircle size={17} className="text-red-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-red-700 dark:text-red-400">เหตุผลที่ถูกยกเลิก</p>
+                  <p className="text-sm text-red-600 dark:text-red-300 mt-1 leading-relaxed">{apt.cancelReason}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -662,7 +734,7 @@ function Row({ icon, label, value }: { icon: React.ReactNode; label: string; val
   );
 }
 
-function AppointmentCard({ apt, onClick }: { apt: Appointment; onClick: () => void }) {
+function AppointmentCard({ apt, onClick, onCancel }: { apt: Appointment; onClick: () => void; onCancel?: () => void }) {
   const statusConfig: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
     scheduled: {
       icon: <Calendar size={15} className="text-blue-600" />,
@@ -695,9 +767,12 @@ function AppointmentCard({ apt, onClick }: { apt: Appointment; onClick: () => vo
   const d = new Date(apt.appointmentDate);
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex text-left active:scale-[0.98] transition-transform"
+      onKeyDown={(e) => { if (e.key === "Enter") onClick(); }}
+      className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex text-left active:scale-[0.98] transition-transform cursor-pointer"
     >
       <div className="w-18 w-[72px] bg-blue-800 dark:bg-blue-900 flex flex-col items-center justify-center text-white flex-shrink-0 py-4">
         <span className="text-2xl font-extrabold leading-none">{d.getDate()}</span>
@@ -728,10 +803,25 @@ function AppointmentCard({ apt, onClick }: { apt: Appointment; onClick: () => vo
           <User size={13} /> {apt.staffName}
         </p>
         {apt.reason && <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5">{apt.reason}</p>}
+        {apt.status === "cancelled" && apt.cancelReason && (
+          <p className="text-xs text-red-500 dark:text-red-400 mt-1 truncate flex items-center gap-1">
+            <XCircle size={11} className="flex-shrink-0" />
+            {apt.cancelReason}
+          </p>
+        )}
+        {onCancel && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onCancel(); }}
+            className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+          >
+            <XCircle size={13} />
+            ยกเลิกนัด
+          </button>
+        )}
       </div>
       <div className="flex items-center pr-3">
         <ChevronRight size={16} className="text-gray-400" />
       </div>
-    </button>
+    </div>
   );
 }

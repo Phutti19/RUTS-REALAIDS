@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsUrl, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUrl, MaxLength } from 'class-validator';
 
 /**
  * Matches the structure produced by browser's PushSubscription.toJSON()
@@ -31,4 +31,10 @@ export class SubscribePushDto {
   @IsNotEmpty()
   @MaxLength(500)
   auth: string;
+
+  /** Device information (e.g. user-agent string) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  deviceInfo?: string;
 }

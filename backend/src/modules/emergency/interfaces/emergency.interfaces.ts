@@ -6,8 +6,9 @@ export interface IncidentRow {
   incident_type: string;
   severity: string;
   description: string | null;
-  latitude: number | null;
-  longitude: number | null;
+  latitude: number;
+  longitude: number;
+  location_name: string | null;
   status: string;
   created_at: Date;
   updated_at: Date;
@@ -31,6 +32,8 @@ export interface IncidentImageRow {
   id: string;
   incident_id: string;
   image_url: string;
+  caption: string | null;
+  sort_order: number;
   uploaded_at: Date;
 }
 
@@ -40,13 +43,14 @@ export interface IncidentResponderRow {
   responder_id: string;
   accepted_at: Date;
   arrived_at: Date | null;
+  notes: string | null;
 }
 
 export interface IncidentStatusLogRow {
   id: string;
   incident_id: string;
-  changed_by: string | null;
-  old_status: string | null;
+  changed_by: string;
+  old_status: string;
   new_status: string;
   note: string | null;
   created_at: Date;
@@ -92,14 +96,16 @@ export interface IncidentImage {
   id: string;
   incidentId: string;
   imageUrl: string;
-  createdAt: Date;
+  caption: string | null;
+  sortOrder: number;
+  uploadedAt: Date;
 }
 
 export interface IncidentStatusLog {
   id: string;
   incidentId: string;
-  changedBy: string | null;
-  oldStatus: string | null;
+  changedBy: string;
+  oldStatus: string;
   newStatus: string;
   note: string | null;
   createdAt: Date;

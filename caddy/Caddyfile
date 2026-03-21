@@ -1,0 +1,29 @@
+{
+	https_port 4443
+	http_port 4080
+}
+
+ruts-realaids.duckdns.org:4443 {
+	tls {
+		dns duckdns {env.DUCKDNS_TOKEN}
+	}
+
+	# Backend API
+	handle /api/* {
+		reverse_proxy backend:4000
+	}
+
+	# WebSocket
+	handle /ws {
+		reverse_proxy backend:4000
+	}
+
+	# Frontend (catch-all)
+	handle {
+		reverse_proxy frontend:4002
+	}
+}
+
+http://ruts-realaids.duckdns.org:4080 {
+	redir https://ruts-realaids.duckdns.org:4443{uri} permanent
+}

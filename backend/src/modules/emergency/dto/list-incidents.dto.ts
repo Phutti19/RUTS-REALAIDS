@@ -26,7 +26,7 @@ export class ListIncidentsDto {
   limit?: number = 20;
 
   @IsOptional()
-  @Transform(({ value }) => (value ? (Array.isArray(value) ? value : [value]) : undefined))
+  @Transform(({ value }) => (value ? (Array.isArray(value) ? value : String(value).split(',')) : undefined))
   @IsArray()
   @IsEnum(['pending', 'accepted', 'in_progress', 'completed', 'cancelled'], { each: true })
   status?: string[];

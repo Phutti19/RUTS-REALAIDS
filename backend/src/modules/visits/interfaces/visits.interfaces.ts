@@ -24,6 +24,9 @@ export interface VisitRow {
   treatment: string | null;
   status: string;
   created_at: Date;
+  completed_at: Date | null;
+  visited_at: Date | null;
+  /** Virtual column: COALESCE(completed_at, created_at) AS updated_at — used in SQL queries */
   updated_at: Date;
   // Clinical fields added by migration
   illness_history: string | null;
@@ -31,6 +34,7 @@ export interface VisitRow {
   rest_hours: string | null; // NUMERIC returned as string by pg driver
   consultation_types: string[];
   is_referred: boolean;
+  treatment_type_id: string | null;
 }
 
 /** Extended row from JOIN (includes patient + staff name columns) */
@@ -86,6 +90,7 @@ export interface Visit extends VisitSummary {
   restHours: number | null;
   consultationTypes: string[];
   isReferred: boolean;
+  treatmentTypeId: string | null;
   patient: {
     id: string;
     firstName: string;

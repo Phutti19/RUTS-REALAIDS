@@ -20,6 +20,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { ListAppointmentsDto } from './dto/list-appointments.dto';
 import { CancelAppointmentDto } from './dto/cancel-appointment.dto';
+import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 
 @Controller('appointments')
 @UseGuards(AuthGuard)
@@ -155,6 +156,23 @@ export class AppointmentsController {
     @Body() dto: CancelAppointmentDto,
   ) {
     const data = await this.appointmentsService.cancel(id, callerId, callerRole, dto);
+    return { success: true, data };
+  }
+
+  /**
+   * PATCH /api/v1/appointments/:id/reschedule
+   * Reschedule an appointment to a new slot/date.
+   * Staff/admin only. Status must be 'scheduled'.
+   */
+  @Patch(':id/reschedule')
+  @UseGuards(RolesGuard)
+  @Roles('staff', 'admin')
+  async reschedule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') callerId: string,
+    @Body() dto: RescheduleAppointmentDto,
+  ) {
+    const data = await this.appointmentsService.reschedule(id, callerId, dto);
     return { success: true, data };
   }
 

@@ -50,7 +50,8 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const ipAddress = this.extractIp(req);
-    const { accessToken, refreshToken, user } = await this.authService.login(dto, ipAddress);
+    const userAgent = (req.headers['user-agent'] as string) ?? null;
+    const { accessToken, refreshToken, user } = await this.authService.login(dto, ipAddress, userAgent);
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
     return { success: true, data: { accessToken, user } };
   }

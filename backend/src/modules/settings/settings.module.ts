@@ -5,6 +5,7 @@ import { BackupsController } from './backups.controller';
 import { EmergencyContactsController } from './emergency-contacts.controller';
 import { AuditLogsController } from './audit-logs.controller';
 import { TreatmentTypesController } from './treatment-types.controller';
+import { FacultiesController } from './faculties.controller';
 import { LoginAttemptsController } from './login-attempts.controller';
 import { BroadcastController } from './broadcast.controller';
 import { SettingsService } from './settings.service';
@@ -19,6 +20,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     EmergencyContactsController,
     AuditLogsController,
     TreatmentTypesController,
+    FacultiesController,
     LoginAttemptsController,
     BroadcastController,
   ],

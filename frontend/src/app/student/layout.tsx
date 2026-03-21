@@ -43,14 +43,14 @@ export default function StudentLayout({
   }
 
   return (
-    <div className="portal-page min-h-screen bg-slate-200 dark:bg-gray-950 pb-20">
+    <div className="portal-page min-h-[100dvh] bg-slate-200 dark:bg-gray-950 student-portal-wrapper">
       {/* On tablet+: the content column appears as a centered card */}
-      <main className="page-enter max-w-md sm:max-w-xl md:max-w-2xl mx-auto bg-slate-100 dark:bg-gray-900 min-h-screen sm:shadow-2xl sm:shadow-black/10">
+      <main className="page-enter max-w-md sm:max-w-xl md:max-w-2xl mx-auto bg-slate-100 dark:bg-gray-900 min-h-[100dvh] sm:shadow-2xl sm:shadow-black/10">
         {children}
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="nav-slide-up fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 z-50">
+      <nav className="nav-slide-up fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 z-50 student-bottom-nav">
         <div className="max-w-md sm:max-w-xl md:max-w-2xl mx-auto flex items-center">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const isActive = pathname.startsWith(href);
@@ -70,7 +70,7 @@ export default function StudentLayout({
                   <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full" />
                 )}
                 <Icon
-                  size={24}
+                  size={22}
                   className={cn(
                     "transition-transform duration-200",
                     isActive
@@ -78,7 +78,7 @@ export default function StudentLayout({
                       : "stroke-gray-500 dark:stroke-gray-400"
                   )}
                 />
-                <span className="font-medium">{label}</span>
+                <span className="font-medium text-xs">{label}</span>
               </Link>
             );
           })}

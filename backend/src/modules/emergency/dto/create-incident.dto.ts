@@ -1,5 +1,6 @@
 import {
   IsEnum,
+  IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
@@ -26,17 +27,17 @@ export class CreateIncidentDto {
   @Transform(({ value }: { value: string }) => value?.trim() || null)
   description?: string | null;
 
-  @IsOptional()
+  @IsNotEmpty({ message: 'latitude is required' })
   @IsNumber()
   @Min(-90)
   @Max(90)
-  latitude?: number;
+  latitude: number;
 
-  @IsOptional()
+  @IsNotEmpty({ message: 'longitude is required' })
   @IsNumber()
   @Min(-180)
   @Max(180)
-  longitude?: number;
+  longitude: number;
 
   @IsOptional()
   @IsString()

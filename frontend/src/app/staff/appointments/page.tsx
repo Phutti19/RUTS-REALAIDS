@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Calendar, ChevronLeft, ChevronRight, Loader2, User,
   CheckCircle2, XCircle, Plus, Clock, AlertCircle,
-  CalendarCheck, CalendarX, Users,
+  CalendarCheck, CalendarX, Users, CalendarClock, X,
 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { Appointment, AppointmentStatus } from "@/types";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import type { Appointment, AppointmentSlot, AppointmentStatus } from "@/types";
 
 /* ─── helpers ─────────────────────────────────────────────── */
 function getInitials(name: string): string {
@@ -68,6 +69,21 @@ export default function StaffAppointmentsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterTab>("all");
 
+  // Cancel dialog state
+  const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
+
+  // Reschedule dialog state
+  const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleSlots, setRescheduleSlots] = useState<AppointmentSlot[]>([]);
+  const [rescheduleSlot, setRescheduleSlot] = useState<AppointmentSlot | null>(null);
+  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState("");
+  const [rescheduleReason, setRescheduleReason] = useState("");
+
   useEffect(() => {
     setLoading(true);
     api.get<Appointment[]>(`/appointments?date=${selectedDate}&limit=100`).then((res) => {
@@ -92,25 +108,110 @@ export default function StaffAppointmentsPage() {
     });
   }, [viewYear, viewMonth]);
 
+  // Real-time: refresh when any appointment is created/updated/cancelled/rescheduled
+  const refreshAppointments = useCallback(() => {
+    api.get<Appointment[]>(`/appointments?date=${selectedDate}&limit=100`).then((res) => {
+      setAppointments(Array.isArray(res.data) ? (res.data as unknown as Appointment[]) : []);
+    });
+    // Also refresh month counts
+    const from = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-01`;
+    const lastDay = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const to = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${lastDay}`;
+    api.get<Appointment[]>(`/appointments?from=${from}&to=${to}&limit=500`).then((res) => {
+      const counts: Record<string, number> = {};
+      if (Array.isArray(res.data)) {
+        (res.data as unknown as Appointment[]).forEach((a) => {
+          const d = a.appointmentDate;
+          counts[d] = (counts[d] ?? 0) + 1;
+        });
+      }
+      setMonthCounts(counts);
+    });
+  }, [selectedDate, viewYear, viewMonth]);
+
+  // Close reschedule/cancel dialogs if the target appointment is no longer 'scheduled'
+  const handleAppointmentUpdate = useCallback(() => {
+    refreshAppointments();
+    // Close dialogs — the appointment may have been cancelled/updated by another user
+    setRescheduleTarget((prev) => {
+      if (prev) {
+        setRescheduleError("นัดหมายถูกอัปเดตจากที่อื่น กรุณาลองใหม่");
+        return null;
+      }
+      return prev;
+    });
+    setCancelTarget(null);
+  }, [refreshAppointments]);
+
+  useWebSocket("appointment:update", handleAppointmentUpdate, [handleAppointmentUpdate]);
+
   const checkIn = async (id: string) => {
     setActionLoading(id);
     await api.patch(`/appointments/${id}/check-in`);
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "checked_in" } : a)));
     setActionLoading(null);
   };
-  const cancel = async (id: string) => {
-    if (!confirm("ยืนยันยกเลิกนัด?")) return;
-    setActionLoading(id);
-    await api.patch(`/appointments/${id}/cancel`, { cancelReason: "ยกเลิกโดยเจ้าหน้าที่" });
-    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a)));
-    setActionLoading(null);
+
+  const openCancelDialog = (apt: Appointment) => {
+    setCancelTarget(apt);
+    setCancelReason("");
   };
+  const confirmCancel = async () => {
+    if (!cancelTarget || !cancelReason.trim()) return;
+    setCancelLoading(true);
+    await api.patch(`/appointments/${cancelTarget.id}/cancel`, { cancelReason: cancelReason.trim() });
+    setAppointments((prev) => prev.map((a) => (a.id === cancelTarget.id ? { ...a, status: "cancelled", cancelReason: cancelReason.trim() } : a)));
+    setCancelLoading(false);
+    setCancelTarget(null);
+  };
+
   const markNoShow = async (id: string) => {
     if (!confirm("ยืนยันว่าผู้ป่วยไม่มา?")) return;
     setActionLoading(id);
     await api.patch(`/appointments/${id}/no-show`);
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "no_show" } : a)));
     setActionLoading(null);
+  };
+
+  // Reschedule handlers
+  const openRescheduleDialog = (apt: Appointment) => {
+    setRescheduleTarget(apt);
+    setRescheduleDate("");
+    setRescheduleSlots([]);
+    setRescheduleSlot(null);
+    setRescheduleError("");
+    setRescheduleReason("");
+  };
+  const loadRescheduleSlots = async (date: string) => {
+    setRescheduleDate(date);
+    setRescheduleSlot(null);
+    setRescheduleError("");
+    if (!date) { setRescheduleSlots([]); return; }
+    setRescheduleSlotsLoading(true);
+    const res = await api.get<AppointmentSlot[]>(`/appointment-slots/available?date=${date}`);
+    setRescheduleSlots(Array.isArray(res.data) ? (res.data as unknown as AppointmentSlot[]) : []);
+    setRescheduleSlotsLoading(false);
+  };
+  const confirmReschedule = async () => {
+    if (!rescheduleTarget || !rescheduleSlot || !rescheduleDate) return;
+    setRescheduleLoading(true);
+    setRescheduleError("");
+    const res = await api.patch(`/appointments/${rescheduleTarget.id}/reschedule`, {
+      slotId: rescheduleSlot.id,
+      date: rescheduleDate,
+      reason: rescheduleReason.trim() || undefined,
+    });
+    setRescheduleLoading(false);
+    if (res.success) {
+      setRescheduleTarget(null);
+    } else {
+      setRescheduleError(res.message ?? "เกิดข้อผิดพลาด");
+    }
+    // Always refresh appointments (whether success or error, status may have changed)
+    setLoading(true);
+    const refreshRes = await api.get<Appointment[]>(`/appointments?date=${selectedDate}&limit=100`);
+    setAppointments(Array.isArray(refreshRes.data) ? (refreshRes.data as unknown as Appointment[]) : []);
+    setLoading(false);
   };
 
   const stats = useMemo(() => ({
@@ -386,6 +487,13 @@ export default function StaffAppointmentsPage() {
                                 เช็คอิน
                               </button>
                             )}
+                            {apt.status === "scheduled" && (
+                              <button onClick={() => openRescheduleDialog(apt)}
+                                className="flex items-center gap-2 text-sm bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-400 px-4 py-2 rounded-xl transition-colors font-semibold">
+                                <CalendarClock size={14} />
+                                เลื่อนนัด
+                              </button>
+                            )}
                             {apt.status === "checked_in" && (
                               <button onClick={() => markNoShow(apt.id)} disabled={isLoading}
                                 className="flex items-center gap-2 text-sm bg-orange-100 hover:bg-orange-200 dark:bg-orange-900/30 dark:hover:bg-orange-900/50 text-orange-700 dark:text-orange-400 px-4 py-2 rounded-xl transition-colors disabled:opacity-50 font-semibold">
@@ -394,8 +502,8 @@ export default function StaffAppointmentsPage() {
                               </button>
                             )}
                             {apt.status === "scheduled" && (
-                              <button onClick={() => cancel(apt.id)} disabled={isLoading}
-                                className="flex items-center gap-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-red-50 dark:hover:bg-red-950/20 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 px-4 py-2 rounded-xl transition-colors disabled:opacity-50 font-semibold">
+                              <button onClick={() => openCancelDialog(apt)}
+                                className="flex items-center gap-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-red-50 dark:hover:bg-red-950/20 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 px-4 py-2 rounded-xl transition-colors font-semibold">
                                 <XCircle size={14} />
                                 ยกเลิก
                               </button>
@@ -411,6 +519,154 @@ export default function StaffAppointmentsPage() {
           )}
         </div>
       </div>
+
+      {/* ── Cancel Dialog ─────────────────────────────────────── */}
+      {cancelTarget && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setCancelTarget(null)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">ยกเลิกนัดหมาย</h3>
+                <button onClick={() => setCancelTarget(null)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                  <X size={18} className="text-gray-400" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                ผู้ป่วย: <span className="font-semibold text-gray-700 dark:text-gray-200">{cancelTarget.patientName}</span>
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                เวลา: {cancelTarget.appointmentTime.slice(0, 5)} น. — {cancelTarget.reason}
+              </p>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+                เหตุผลในการยกเลิก <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="เช่น เจ้าหน้าที่ไม่ว่าง, ผู้ป่วยแจ้งยกเลิก..."
+                rows={3}
+                maxLength={500}
+                className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none bg-gray-50 dark:bg-gray-700 dark:text-white"
+              />
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => setCancelTarget(null)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                  ปิด
+                </button>
+                <button onClick={confirmCancel} disabled={!cancelReason.trim() || cancelLoading}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  {cancelLoading ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                  ยืนยันยกเลิก
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Reschedule Dialog ─────────────────────────────────── */}
+      {rescheduleTarget && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setRescheduleTarget(null)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[85vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">เลื่อนนัดหมาย</h3>
+                <button onClick={() => setRescheduleTarget(null)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                  <X size={18} className="text-gray-400" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                ผู้ป่วย: <span className="font-semibold text-gray-700 dark:text-gray-200">{rescheduleTarget.patientName}</span>
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                นัดเดิม: {rescheduleTarget.appointmentDate} เวลา {rescheduleTarget.appointmentTime.slice(0, 5)} น.
+              </p>
+
+              {/* Date picker */}
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">เลือกวันใหม่</label>
+              <input
+                type="date"
+                value={rescheduleDate}
+                min={toLocalDateStr(new Date())}
+                onChange={(e) => loadRescheduleSlots(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50 dark:bg-gray-700 dark:text-white mb-4"
+              />
+
+              {/* Available slots */}
+              {rescheduleDate && (
+                <div className="mb-4">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">เลือกช่วงเวลา</label>
+                  {rescheduleSlotsLoading ? (
+                    <div className="py-4 flex justify-center"><Loader2 size={20} className="animate-spin text-gray-300" /></div>
+                  ) : rescheduleSlots.length === 0 ? (
+                    <p className="text-sm text-gray-400 py-3 text-center">ไม่มีช่วงเวลาว่างในวันนี้</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {rescheduleSlots.map((slot) => (
+                        <button
+                          key={slot.id}
+                          onClick={() => setRescheduleSlot(slot)}
+                          disabled={!!slot.isFull}
+                          className={cn(
+                            "p-3 rounded-xl border-2 text-left transition-all text-sm",
+                            slot.isFull
+                              ? "border-gray-100 bg-gray-50 opacity-40 cursor-not-allowed"
+                              : rescheduleSlot?.id === slot.id
+                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-sm"
+                              : "border-gray-200 dark:border-gray-600 hover:border-blue-200 bg-white dark:bg-gray-700"
+                          )}
+                        >
+                          <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-gray-100">
+                            <Clock size={13} className="text-blue-500" />
+                            {slot.startTime.slice(0, 5)} น.
+                          </div>
+                          <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                            <User size={11} /> {slot.staffName}
+                          </div>
+                          {slot.isFull && <p className="text-[10px] text-gray-400 mt-1">เต็มแล้ว</p>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Reason */}
+              <div className="mb-4">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+                  เหตุผลในการเลื่อน <span className="text-gray-400 text-xs">(ไม่บังคับ)</span>
+                </label>
+                <textarea
+                  value={rescheduleReason}
+                  onChange={(e) => setRescheduleReason(e.target.value)}
+                  placeholder="เช่น เจ้าหน้าที่ไม่ว่าง, ผู้ป่วยแจ้งเลื่อน..."
+                  rows={2}
+                  maxLength={500}
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none bg-gray-50 dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+
+              {rescheduleError && (
+                <p className="text-red-600 text-xs mb-3 bg-red-50 dark:bg-red-900/20 rounded-xl p-2">{rescheduleError}</p>
+              )}
+
+              <div className="flex gap-2">
+                <button onClick={() => setRescheduleTarget(null)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                  ปิด
+                </button>
+                <button onClick={confirmReschedule} disabled={!rescheduleSlot || !rescheduleDate || rescheduleLoading}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  {rescheduleLoading ? <Loader2 size={14} className="animate-spin" /> : <CalendarClock size={14} />}
+                  ยืนยันเลื่อนนัด
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

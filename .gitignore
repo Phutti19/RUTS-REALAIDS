@@ -116,3 +116,10 @@ ruts-realaids.tar
 
 # Server uploads folder
 server/
+
+# Build/Deploy scripts (environment-specific)
+build.ps1
+deploy.sh
+
+# Claude Code
+CLAUDE.md

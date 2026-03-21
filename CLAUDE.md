@@ -12,29 +12,37 @@ A web application (PWA) for reporting emergencies and managing the university in
 - **Next.js 16.x** — App Router, Server Components
 - **React 19.x**
 - **TypeScript 5.x**
-- **Tailwind CSS 4.x**
-- **Radix UI** — Headless UI components
+- **Tailwind CSS 4.x** — PostCSS plugin (no `tailwind.config.ts`, uses CSS-first config)
+- **Radix UI** — Headless UI components (dialog, select, tabs, toast, tooltip, dropdown-menu, etc.)
+- **Lucide React** — Icon library
 - **Recharts 3.x** — Charts & graphs for dashboard
-- **Leaflet 1.9.x + OpenStreetMap** — Interactive maps (GPS incidents)
-- **Jose 5.x** — JWT handling on client side
+- **Leaflet 1.9.x + react-leaflet 5.x + OpenStreetMap** — Interactive maps (GPS incidents)
+- **Jose 6.x** — JWT handling on client side
+- **class-variance-authority + clsx + tailwind-merge** — Utility CSS class helpers
 - **PWA** — Service Worker, Web Push Notifications
 
 ### Backend (`/backend`)
 - **Node.js 20.x**
-- **Nest.js 4.x** — HTTP framework (NOT Express directly)
+- **NestJS 10.x** (`@nestjs/common`, `@nestjs/core`, `@nestjs/platform-express`)
 - **TypeScript 5.x**
 - **ws 8.x** — WebSocket server for real-time updates
 - **pg 8.x** — PostgreSQL driver (raw queries, NOT TypeORM/Prisma)
 - **Helmet 7.x** — Security headers
 - **Morgan 1.x** — HTTP request logging
 - **jsonwebtoken 9.x** — JWT token auth on server side
-- **bcrypt** — Password hashing
+- **bcryptjs 2.x** — Password hashing (bcryptjs, NOT native bcrypt)
+- **@nestjs/config 3.x** — Environment configuration
+- **@nestjs/schedule 6.x** — Cron jobs (e.g. appointment no-show)
+- **cookie-parser 1.x** — Parse cookies (refresh token)
+- **pdfkit 0.17.x** — PDF generation (certificates, reports)
+- **web-push 3.x** — Web Push Notifications (VAPID)
 
 ### Database
 - **PostgreSQL 16+** — Main database
 - Database name: `ruts_realaids`
 - Schema: `public`
-- 24 tables, 4 views, 13 enum types
+- 26 tables, 4 views, 13 enum types
+- Data Dictionary: [`docs/data-dictionary.md`](docs/data-dictionary.md)
 
 ### Infrastructure
 - Timezone: `Asia/Bangkok`
@@ -48,79 +56,97 @@ ruts-realaids/
 ├── frontend/                    # Next.js 16 App
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── (auth)/         # Login pages
-│   │   │   │   └── login/
-│   │   │   ├── (student)/      # Student portal
-│   │   │   │   ├── dashboard/
-│   │   │   │   ├── appointments/
-│   │   │   │   └── profile/
-│   │   │   ├── (staff)/        # Staff portal
+│   │   │   ├── (auth)/         # Auth pages (route group with layout)
+│   │   │   │   ├── login/
+│   │   │   │   ├── register/
+│   │   │   │   ├── forgot-password/
+│   │   │   │   └── reset-password/
+│   │   │   ├── staff/          # Staff portal (with layout.tsx)
 │   │   │   │   ├── dashboard/
 │   │   │   │   ├── emergency/
-│   │   │   │   ├── patients/
-│   │   │   │   ├── medicines/
-│   │   │   │   ├── appointments/
+│   │   │   │   ├── patients/        # list, [id], [id]/certificate, new
+│   │   │   │   ├── medicines/       # list, [id], new
+│   │   │   │   ├── appointments/    # list, slots/
 │   │   │   │   ├── reports/
-│   │   │   │   └── settings/
+│   │   │   │   ├── settings/
+│   │   │   │   └── notifications/
+│   │   │   ├── student/        # Student portal (with layout.tsx)
+│   │   │   │   ├── dashboard/
+│   │   │   │   ├── emergency/       # report/, track/[id]/
+│   │   │   │   ├── appointments/
+│   │   │   │   ├── history/
+│   │   │   │   ├── notifications/
+│   │   │   │   └── profile/
 │   │   │   └── layout.tsx
 │   │   ├── components/
-│   │   │   ├── ui/             # Radix UI wrappers
 │   │   │   ├── maps/           # Leaflet map components
-│   │   │   ├── charts/         # Recharts components
 │   │   │   └── shared/         # Common components
 │   │   ├── lib/
 │   │   │   ├── api.ts          # API client (fetch wrapper)
 │   │   │   ├── auth.ts         # JWT utilities (jose)
 │   │   │   ├── websocket.ts    # WebSocket client
 │   │   │   └── utils.ts
-│   │   ├── hooks/              # Custom React hooks
-│   │   ├── types/              # TypeScript type definitions
-│   │   └── styles/
+│   │   ├── hooks/              # useAuth, useWebSocket, usePushNotification, useFaculties
+│   │   └── types/              # TypeScript type definitions (index.ts)
 │   ├── public/
 │   │   ├── manifest.json       # PWA manifest
-│   │   └── sw.js               # Service Worker
+│   │   ├── sw.js               # Service Worker
+│   │   ├── offline.html        # Offline fallback page
+│   │   └── icons/              # PWA icons
 │   ├── next.config.ts
-│   ├── tailwind.config.ts
+│   ├── postcss.config.mjs      # Tailwind CSS 4 PostCSS plugin
 │   ├── tsconfig.json
 │   └── package.json
 │
-├── backend/                     # Nest.js API
+├── backend/                     # NestJS 10 API
 │   ├── src/
 │   │   ├── modules/
-│   │   │   ├── auth/           # Login, register, JWT, password reset
+│   │   │   ├── auth/           # Login, register, JWT, refresh, password reset
 │   │   │   ├── users/          # User CRUD, health profiles
-│   │   │   ├── emergency/      # Incidents, responders, status logs
+│   │   │   ├── emergency/      # Incidents, responders, status logs, images
 │   │   │   ├── visits/         # Patient visits, visit medications
 │   │   │   ├── medicines/      # Medicines, batches, stock logs
-│   │   │   ├── certificates/   # Medical certificates
-│   │   │   ├── appointments/   # Appointments, slots
+│   │   │   ├── certificates/   # Medical certificates, PDF generation
+│   │   │   ├── appointments/   # Appointments, slots, cron (no-show)
 │   │   │   ├── notifications/  # Notifications, push subscriptions
-│   │   │   ├── reports/        # Reports & statistics
-│   │   │   └── settings/       # System settings, backups
+│   │   │   ├── reports/        # Reports, statistics, PDF export
+│   │   │   └── settings/       # System settings, backups, admin users,
+│   │   │                       #   emergency contacts, treatment types,
+│   │   │                       #   faculties, audit logs, login attempts,
+│   │   │                       #   broadcast notifications
 │   │   ├── common/
 │   │   │   ├── guards/         # AuthGuard, RolesGuard
 │   │   │   ├── decorators/     # @Roles(), @CurrentUser()
 │   │   │   ├── interceptors/   # AuditLog interceptor
-│   │   │   ├── filters/        # Exception filters
-│   │   │   └── pipes/          # Validation pipes
+│   │   │   ├── filters/        # HttpException filter
+│   │   │   └── pipes/          # Validation pipe
 │   │   ├── database/
 │   │   │   ├── db.module.ts    # PostgreSQL connection (pg Pool)
 │   │   │   └── db.service.ts   # Query helper methods
 │   │   ├── websocket/
-│   │   │   ├── ws.gateway.ts   # WebSocket gateway (ws library)
-│   │   │   └── ws.service.ts   # Broadcast helpers
+│   │   │   ├── ws.module.ts    # WebSocket module
+│   │   │   └── ws.service.ts   # WebSocket server + broadcast helpers
 │   │   ├── app.module.ts
+│   │   ├── app.controller.ts   # Health check
+│   │   ├── app.service.ts
 │   │   └── main.ts
 │   ├── tsconfig.json
 │   └── package.json
 │
 ├── database/                    # SQL files
-│   ├── migration.sql            # Full schema (24 tables)
+│   ├── migration.sql            # Main schema
+│   ├── migration_faculties.sql  # Faculties & departments tables + seed data
+│   ├── add_patient_fields.sql   # Extra patient_visits columns migration
+│   ├── seed-test-data.js        # Test data seeder (Node.js script)
 │   ├── drop_all.sql             # Rollback script
 │   └── verify.sql               # Verification script
 │
 ├── docs/                        # Documentation
-├── .env.example
+│   ├── data-dictionary.md       # Data Dictionary (all tables, views, enums)
+│   ├── test-api.js              # API test script (91 tests)
+│   ├── test-security.js         # Security test script
+│   ├── test-websocket.js        # WebSocket test script
+│   └── *.md                     # Various prompt/checklist docs
 ├── CLAUDE.md                    # THIS FILE
 └── README.md
 ```
@@ -143,7 +169,7 @@ ruts-realaids/
 6. Role-based guards: `@Roles('staff', 'admin')` on staff-only routes
 7. Failed login attempts tracked in `login_attempts` table (brute force protection)
 
-## Database Schema (24 Tables)
+## Database Schema (26 Tables)
 
 ### Users & Security (5 tables)
 - `users` — id, student_id, email, password_hash, first_name, last_name, phone, role, avatar_url, is_active, last_login_at; extra profile fields: **national_id** (varchar 13), **title**, **birth_date**, **department**, **year_of_study** (smallint), **position**, **faculty** — student-specific: student_id/department/faculty/year_of_study; staff-specific: position
@@ -154,14 +180,14 @@ ruts-realaids/
 
 ### Emergency (5 tables)
 
-- `emergency_incidents` — reporter_id, incident_type, severity, latitude (NOT NULL), longitude (NOT NULL), location_name (nullable), status (pending→accepted→in_progress→completed), responded_at, resolved_at
+- `emergency_incidents` — reporter_id, incident_type, severity, **description** (nullable text), latitude (NOT NULL), longitude (NOT NULL), location_name (nullable), status (pending→accepted→in_progress→completed), responded_at, resolved_at
 - `incident_images` — incident_id, image_url, caption, sort_order (default 0), **uploaded_at** (NOT NULL, ไม่ใช่ created_at)
 - `incident_responders` — incident_id, responder_id, accepted_at, arrived_at, **notes** (nullable) — unique constraint: **(incident_id, responder_id)**
 - `incident_status_logs` — incident_id, changed_by, **old_status** (NOT NULL), new_status, note — ห้าม INSERT NULL สำหรับ old_status
 - `emergency_contacts_directory` — name, category (hospital/police/rescue/fire/**other**), phone, phone_secondary, address, latitude, longitude, note, is_primary, is_active
 
 ### Infirmary (4 tables)
-- `treatment_types` — name (wound care, medication, vital signs, etc.), is_active
+- `treatment_types` — name (wound care, medication, vital signs, etc.), **description** (nullable), is_active
 - `patient_visits` — patient_id, staff_id, incident_id, visit_type, chief_complaint, diagnosis, **treatment** (nullable text, ไม่ใช่ treatment_notes), treatment_type_id (FK treatment_types), vital_signs (JSONB), status, referred_to, notes, visited_at, completed_at (ไม่ใช่ updated_at); extra fields: **illness_history**, **wound_care** (boolean NOT NULL default false), **rest_hours** (numeric 4,1), **consultation_types** (text[] NOT NULL default '{}'), **is_referred** (boolean NOT NULL default false)
 - `visit_medications` — visit_id, medicine_id, batch_id, quantity, dosage_instruction, **dispensed_by** (NOT NULL)
 - `medical_certificates` — visit_id, **issued_by** (NOT NULL FK users), certificate_number (auto CERT-YYYY-NNNNNN), diagnosis_text, rest_days, recommendation, rest_start_date, rest_end_date, **issued_at**
@@ -178,6 +204,11 @@ ruts-realaids/
 ### Notifications (2 tables)
 - `notifications` — user_id, type, title, message, reference_type, reference_id (polymorphic), is_read, **read_at**
 - `push_subscriptions` — user_id, endpoint, p256dh_key, auth_key, **device_info**, **is_active** (Web Push API)
+
+### Faculties & Departments (2 tables)
+
+- `faculties` — name (UNIQUE), is_active, sort_order
+- `departments` — faculty_id (FK faculties, ON DELETE CASCADE), name, is_active, sort_order — unique constraint: **(faculty_id, name)**
 
 ### System (3 tables)
 - `system_settings` — key/value pairs (infirmary_lat/lng, alert thresholds, etc.)
@@ -219,12 +250,23 @@ backup_status: in_progress | completed | failed
 
 ## Frontend Pages
 
-### Login Page (`/login`)
+### Auth Pages (route group `(auth)`)
+
+#### Login (`/login`)
 - Choose user type: Student / Staff
 - Email + password form
 - Forgot password link
 
-### Student Portal
+#### Register (`/register`)
+- Student / Staff registration form
+
+#### Forgot Password (`/forgot-password`)
+- Email input → sends reset link
+
+#### Reset Password (`/reset-password`)
+- New password form (from email link)
+
+### Student Portal (`/student`)
 
 #### Dashboard (`/student/dashboard`)
 - **Emergency button** (large, prominent, red) — one-tap to report
@@ -232,17 +274,29 @@ backup_status: in_progress | completed | failed
 - Recent visit history
 - Active notifications
 
+#### Emergency Report (`/student/emergency/report`)
+- Report emergency with GPS location, type, severity, description, images
+
+#### Emergency Track (`/student/emergency/track/[id]`)
+- Real-time status tracking of reported incident
+
 #### Appointments (`/student/appointments`)
 - Upcoming appointments
 - Create new appointment (select available slot)
 - Appointment history
+
+#### History (`/student/history`)
+- Visit/treatment history
+
+#### Notifications (`/student/notifications`)
+- All notifications list (read/unread)
 
 #### Profile (`/student/profile`)
 - Personal info (name, student_id, email, phone)
 - Health info (blood type, allergies, chronic diseases, emergency contact)
 - Settings
 
-### Staff Portal
+### Staff Portal (`/staff`)
 
 #### Dashboard (`/staff/dashboard`)
 - Real-time incident feed (WebSocket)
@@ -257,22 +311,27 @@ backup_status: in_progress | completed | failed
 - Distance from infirmary to incident (calculated from GPS)
 
 #### Patient Management (`/staff/patients`)
-- Patient list with search
-- Individual patient record
-- Treatment history
-- Print medical certificate (PDF export)
+- Patient list with search (`/staff/patients`)
+- Register walk-in patient (`/staff/patients/new`)
+- Individual patient record (`/staff/patients/[id]`)
+- Medical certificate (`/staff/patients/[id]/certificate`)
 
 #### Medicine Inventory (`/staff/medicines`)
-- Medicine list with stock levels
+- Medicine list with stock levels (`/staff/medicines`)
+- Medicine detail (`/staff/medicines/[id]`)
+- Add new medicine (`/staff/medicines/new`)
 - Low stock alerts (highlighted)
 - Expiring soon alerts (from batches)
 - Stock in/out log
 - Add new batch
 
 #### Appointments (`/staff/appointments`)
-- Calendar view
-- Create appointment slots
+- Appointment list / calendar view (`/staff/appointments`)
+- Manage appointment slots (`/staff/appointments/slots`)
 - Check-in / Cancel
+
+#### Notifications (`/staff/notifications`)
+- Staff notifications list
 
 #### Reports (`/staff/reports`)
 - Daily/monthly report
@@ -283,9 +342,13 @@ backup_status: in_progress | completed | failed
 #### Settings (`/staff/settings`)
 - Profile
 - Notification preferences
+- Treatment types management
+- Emergency contacts directory
+- Faculty/department management
 - User management (admin only)
 - System settings (admin only)
 - Data backup (admin only)
+- Broadcast notifications (admin only)
 
 ## Real-time Features (WebSocket)
 
@@ -312,10 +375,14 @@ Events broadcast via WebSocket (`ws` library):
 
 ## Security Rules
 
-- Passwords hashed with **bcrypt** (salt rounds: 12)
+- Passwords hashed with **bcryptjs** (salt rounds: 12)
 - JWT access token: 15 minutes expiry
 - JWT refresh token: 7 days expiry, stored in `refresh_tokens` table
-- All FK to `users` use **ON DELETE RESTRICT** (no hard delete — use `is_active = false`)
+- Users are soft-deleted (`is_active = false`), not hard-deleted
+- FK to `users` ON DELETE policy varies by table:
+  - **RESTRICT** — core data: incidents, visits, responders, certificates, batches, stock logs, medications, slots
+  - **CASCADE** — user-owned data: refresh_tokens, password_reset_tokens, health_profiles, notifications, push_subscriptions
+  - **SET NULL** — logs/metadata: audit_logs, login_attempts, data_backups, system_settings
 - HTTPS required in production
 - Helmet.js for security headers
 - Rate limiting on auth endpoints
@@ -372,20 +439,20 @@ NEXT_PUBLIC_MAP_CENTER_LNG=100.5930
 
 ## Development Order
 
-Build modules in this order (backend first, then frontend):
+Build modules in this order (backend first, then frontend). All modules are implemented.
 
-1. **Database** — Already done (24 tables created)
-2. **Backend Setup** — Nest.js project, PostgreSQL connection, folder structure
+1. **Database** — Done (26 tables, 4 views, 13 enums)
+2. **Backend Setup** — NestJS project, PostgreSQL connection, folder structure
 3. **Auth Module** — Login, register, JWT, refresh, password reset, login attempts
 4. **Users Module** — CRUD, health profiles
 5. **Emergency Module** — Incidents CRUD, responders, status logs, images, WebSocket broadcast
 6. **Visits Module** — Patient visits, visit medications, treatment types
 7. **Certificates Module** — Medical certificates, PDF generation
 8. **Medicines Module** — Medicines, batches, stock logs, alerts
-9. **Appointments Module** — Slots, appointments, check-in
+9. **Appointments Module** — Slots, appointments, check-in, cron (no-show)
 10. **Notifications Module** — CRUD, Web Push integration
 11. **Reports Module** — Statistics queries, PDF export
-12. **Settings Module** — System settings, user management, backups
+12. **Settings Module** — System settings, user management, backups, emergency contacts, treatment types, faculties, audit logs, broadcast
 13. **Frontend Setup** — Next.js project, Tailwind, layout, auth pages
-14. **Student Portal** — Dashboard, emergency report, appointments, profile
-15. **Staff Portal** — Dashboard, emergency management, patients, medicines, reports, settings
+14. **Student Portal** — Dashboard, emergency report/track, appointments, history, notifications, profile
+15. **Staff Portal** — Dashboard, emergency management, patients, medicines, reports, settings, notifications

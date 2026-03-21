@@ -1,10 +1,27 @@
 services:
+  caddy:
+    build: ./caddy
+    container_name: ruts-realaids-caddy
+    restart: unless-stopped
+    ports:
+      - "4443:4443"
+      - "4080:4080"
+    environment:
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+
   backend:
     image: ruts-realaids-backend
     container_name: ruts-realaids-backend
     restart: unless-stopped
-    ports:
-      - "${BACKEND_PORT:-4001}:4000"
+    expose:
+      - "4000"
     environment:
       DATABASE_HOST: ${DATABASE_HOST}
       DATABASE_PORT: ${DATABASE_PORT}
@@ -19,14 +36,17 @@ services:
       NODE_ENV: production
       TZ: ${TZ:-Asia/Bangkok}
       CORS_ORIGIN: ${CORS_ORIGIN}
-      COOKIE_SECURE: "false"
+      COOKIE_SECURE: "true"
+      VAPID_SUBJECT: ${VAPID_SUBJECT}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
 
   frontend:
     image: ruts-realaids-frontend
     container_name: ruts-realaids-frontend
     restart: unless-stopped
-    ports:
-      - "${FRONTEND_PORT:-4000}:4002"
+    expose:
+      - "4002"
     environment:
       PORT: "4002"
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
@@ -35,3 +55,7 @@ services:
       NEXT_PUBLIC_MAP_CENTER_LNG: ${NEXT_PUBLIC_MAP_CENTER_LNG:-100.5930}
     depends_on:
       - backend
+
+volumes:
+  caddy_data:
+  caddy_config:

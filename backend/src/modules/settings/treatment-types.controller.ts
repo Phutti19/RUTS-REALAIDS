@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   UseGuards,
@@ -39,5 +40,11 @@ export class TreatmentTypesController {
   async toggleTreatmentType(@Param('id') id: string) {
     const data = await this.settingsService.toggleTreatmentType(id);
     return { success: true, data };
+  }
+
+  @Delete(':id')
+  async deleteTreatmentType(@Param('id') id: string) {
+    await this.settingsService.deleteTreatmentType(id);
+    return { success: true, message: 'Deleted' };
   }
 }

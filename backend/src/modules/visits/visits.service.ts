@@ -275,6 +275,10 @@ export class VisitsService {
       fields.push(`is_referred = $${idx++}`);
       values.push(dto.isReferred);
     }
+    if (dto.treatmentTypeId !== undefined) {
+      fields.push(`treatment_type_id = $${idx++}`);
+      values.push(dto.treatmentTypeId);
+    }
     if (dto.status !== undefined) {
       fields.push(`status = $${idx++}::visit_status`);
       values.push(dto.status);
@@ -545,6 +549,7 @@ export class VisitsService {
       restHours: row.rest_hours != null ? parseFloat(row.rest_hours) : null,
       consultationTypes: row.consultation_types ?? [],
       isReferred: row.is_referred ?? false,
+      treatmentTypeId: row.treatment_type_id ?? null,
       status: row.status,
       patient: {
         id: row.patient_id,
@@ -670,9 +675,11 @@ export class VisitsService {
     );
 
     // Create empty health profile so joins don't fail
+    // emergency_contact_name & emergency_contact_phone are NOT NULL — use placeholder
     await this.db.query(
-      `INSERT INTO student_health_profiles (user_id) VALUES ($1) ON CONFLICT DO NOTHING`,
-      [id],
+      `INSERT INTO student_health_profiles (user_id, emergency_contact_name, emergency_contact_phone)
+       VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      [id, '-', '-'],
     );
 
     return { id, firstName: dto.firstName, lastName: dto.lastName, studentId, email, role };

@@ -51,16 +51,17 @@ export class EmergencyService {
   ): Promise<IncidentDetail> {
     const incident = await this.db.queryOne<IncidentRow>(
       `INSERT INTO emergency_incidents
-         (reporter_id, incident_type, severity, description, latitude, longitude, status)
-       VALUES ($1, $2::incident_type, $3::severity_level, $4, $5, $6, 'pending')
+         (reporter_id, incident_type, severity, description, latitude, longitude, location_name, status)
+       VALUES ($1, $2::incident_type, $3::severity_level, $4, $5, $6, $7, 'pending')
        RETURNING *`,
       [
         reporterId,
         dto.incidentType,
         dto.severity,
         dto.description ?? null,
-        dto.latitude ?? null,
-        dto.longitude ?? null,
+        dto.latitude,
+        dto.longitude,
+        dto.locationName ?? null,
       ],
     );
 
@@ -342,10 +343,10 @@ export class EmergencyService {
     }
 
     const row = await this.db.queryOne<IncidentImageRow>(
-      `INSERT INTO incident_images (incident_id, image_url)
-       VALUES ($1, $2)
+      `INSERT INTO incident_images (incident_id, image_url, caption, sort_order)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [incidentId, dto.imageUrl],
+      [incidentId, dto.imageUrl, dto.caption ?? null, dto.sortOrder ?? 0],
     );
 
     if (!row) throw new BadRequestException('Failed to add image');
@@ -490,7 +491,9 @@ export class EmergencyService {
       id: row.id,
       incidentId: row.incident_id,
       imageUrl: row.image_url,
-      createdAt: row.uploaded_at,
+      caption: row.caption,
+      sortOrder: row.sort_order,
+      uploadedAt: row.uploaded_at,
     };
   }
 

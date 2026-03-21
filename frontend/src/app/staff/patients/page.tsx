@@ -7,10 +7,11 @@ import {
   Search, Loader2, ChevronRight, ChevronLeft,
   UserCheck, UserX, GraduationCap, User, UserPlus, X,
   AlertCircle, Clock, CheckCircle2, Stethoscope,
-  ArrowRight, ClipboardList, Activity,
+  ArrowRight, ClipboardList, Activity, Briefcase, UserRound,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, timeAgo, statusLabel } from "@/lib/utils";
+import { useFaculties } from "@/hooks/useFaculties";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
 /* ───── types ───── */
@@ -44,6 +45,8 @@ interface StudentUser {
   role: string;
   isActive: boolean;
   department: string | null;
+  faculty: string | null;
+  position: string | null;
   yearOfStudy: number | null;
   createdAt: string;
 }
@@ -64,47 +67,7 @@ const VISIT_TYPES = [
   { value: "follow_up", label: "ติดตาม", desc: "ติดตามอาการเก่า" },
 ];
 
-const FACULTY_DEPARTMENTS: Record<string, string[]> = {
-  "คณะวิศวกรรมศาสตร์": [
-    "วิศวกรรมไฟฟ้า", "วิศวกรรมอิเล็กทรอนิกส์และโทรคมนาคม",
-    "วิศวกรรมคอมพิวเตอร์", "วิศวกรรมเครื่องกล",
-    "วิศวกรรมโยธา", "วิศวกรรมอุตสาหการ",
-    "วิศวกรรมเมคคาทรอนิกส์", "วิศวกรรมเคมีและวัสดุ",
-  ],
-  "คณะวิทยาศาสตร์และเทคโนโลยี": [
-    "เทคโนโลยีสารสนเทศ", "วิทยาการคอมพิวเตอร์",
-    "เคมี", "ฟิสิกส์", "คณิตศาสตร์", "สถิติ",
-    "เทคโนโลยีสิ่งแวดล้อม", "เทคโนโลยีชีวภาพ",
-  ],
-  "คณะครุศาสตร์อุตสาหกรรมและเทคโนโลยี": [
-    "วิศวกรรมไฟฟ้า (ค.อ.บ.)", "วิศวกรรมเครื่องกล (ค.อ.บ.)",
-    "วิศวกรรมคอมพิวเตอร์ (ค.อ.บ.)", "วิศวกรรมโยธา (ค.อ.บ.)",
-    "เทคโนโลยีคอมพิวเตอร์",
-  ],
-  "คณะสถาปัตยกรรมศาสตร์": [
-    "สถาปัตยกรรม", "การออกแบบสถาปัตยกรรมภายใน", "การออกแบบอุตสาหกรรม",
-  ],
-  "คณะบริหารธุรกิจ": [
-    "การบัญชี", "การตลาด", "การจัดการ",
-    "ระบบสารสนเทศทางธุรกิจ", "การเงินและการธนาคาร",
-  ],
-  "คณะเทคโนโลยีการจัดการ": [
-    "การจัดการ", "การบัญชี", "การตลาด", "เทคโนโลยีสารสนเทศธุรกิจ",
-  ],
-  "คณะเกษตรศาสตร์": [
-    "พืชศาสตร์", "สัตวศาสตร์", "อุตสาหกรรมเกษตร", "ประมง",
-  ],
-  "วิทยาลัยเทคโนโลยีอุตสาหกรรมและการจัดการ": [
-    "เทคโนโลยีไฟฟ้าอุตสาหกรรม", "เทคโนโลยีเครื่องกล", "การจัดการโลจิสติกส์",
-  ],
-  "คณะวิศวกรรมศาสตร์และเทคโนโลยี (ตรัง)": [
-    "วิศวกรรมเครื่องกล", "วิศวกรรมไฟฟ้า", "วิศวกรรมโยธา", "เทคโนโลยีสารสนเทศ",
-  ],
-  "คณะวิทยาศาสตร์และเทคโนโลยีการประมง": [
-    "วิทยาศาสตร์ทางทะเล", "การเพาะเลี้ยงสัตว์น้ำ", "ประมง", "เทคโนโลยีอาหาร",
-  ],
-  "อื่นๆ": [],
-};
+// Faculty/department data is now fetched from the API via useFaculties hook
 
 const PAGE_SIZE = 15;
 
@@ -128,6 +91,7 @@ export default function PatientsPage() {
 
   /* ── Registration form ── */
   const [showRegForm, setShowRegForm] = useState(false);
+  const [regPatientType, setRegPatientType] = useState<"student" | "staff_member" | "external">("student");
   const [regTitle, setRegTitle] = useState("นาย");
   const [regFirstName, setRegFirstName] = useState("");
   const [regLastName, setRegLastName] = useState("");
@@ -136,6 +100,8 @@ export default function PatientsPage() {
   const [regFaculty, setRegFaculty] = useState("");
   const [regDepartment, setRegDepartment] = useState("");
   const [regBirthDate, setRegBirthDate] = useState("");
+  const [regNationalId, setRegNationalId] = useState("");
+  const [regPosition, setRegPosition] = useState("");
   const [registering, setRegistering] = useState(false);
   const [regError, setRegError] = useState("");
 
@@ -144,7 +110,7 @@ export default function PatientsPage() {
   const [loadingQueue, setLoadingQueue] = useState(true);
 
   /* ── Bottom tabs state ── */
-  const [tab, setTab] = useState<"queue" | "history" | "students">("queue");
+  const [tab, setTab] = useState<"history" | "students" | "staff" | "external">("history");
   const [visits, setVisits] = useState<PatientVisit[]>([]);
   const [students, setStudents] = useState<StudentUser[]>([]);
   const [total, setTotal] = useState(0);
@@ -158,7 +124,7 @@ export default function PatientsPage() {
     const t = setTimeout(async () => {
       setSearching(true);
       setSearched(false);
-      const res = await api.get<UserResult[]>(`/users?search=${encodeURIComponent(patientSearch)}&role=student&limit=6`);
+      const res = await api.get<UserResult[]>(`/users?search=${encodeURIComponent(patientSearch)}&limit=6`);
       if (res.success) {
         setPatientResults(Array.isArray(res.data) ? (res.data as unknown as UserResult[]) : []);
       }
@@ -196,9 +162,9 @@ export default function PatientsPage() {
     setLoadingList(false);
   }, [page, listSearch]);
 
-  const loadStudents = useCallback(async () => {
+  const loadUsers = useCallback(async (patientType: string) => {
     setLoadingList(true);
-    const params = new URLSearchParams({ role: "student", limit: String(PAGE_SIZE), page: String(page) });
+    const params = new URLSearchParams({ patientType, limit: String(PAGE_SIZE), page: String(page) });
     if (listSearch.trim()) params.set("search", listSearch.trim());
     const res = await api.get<StudentUser[]>(`/users?${params}`);
     if (res.success) {
@@ -210,8 +176,10 @@ export default function PatientsPage() {
 
   useEffect(() => {
     if (tab === "history") loadHistory();
-    else if (tab === "students") loadStudents();
-  }, [tab, loadHistory, loadStudents]);
+    else if (tab === "students") loadUsers("student");
+    else if (tab === "staff") loadUsers("staff_member");
+    else if (tab === "external") loadUsers("external");
+  }, [tab, loadHistory, loadUsers]);
 
   useEffect(() => { setPage(1); }, [listSearch, tab]);
 
@@ -235,18 +203,22 @@ export default function PatientsPage() {
   };
 
   const handleRegister = async () => {
-    if (!regFirstName.trim() || !regLastName.trim() || !regStudentId.trim()) return;
+    if (!regFirstName.trim() || !regLastName.trim()) return;
+    if (regPatientType === "student" && !regStudentId.trim()) return;
     setRegistering(true);
     setRegError("");
     const res = await api.post<UserResult>("/visits/register-patient", {
+      patientType: regPatientType,
       title: regTitle,
       firstName: regFirstName.trim(),
       lastName: regLastName.trim(),
-      studentId: regStudentId.trim(),
+      studentId: regStudentId.trim() || undefined,
       phone: regPhone.trim() || undefined,
       faculty: regFaculty || undefined,
       department: regDepartment.trim() || undefined,
       birthDate: regBirthDate || undefined,
+      nationalId: regNationalId.trim() || undefined,
+      position: regPosition.trim() || undefined,
     });
     setRegistering(false);
     if (res.success && res.data) {
@@ -264,6 +236,7 @@ export default function PatientsPage() {
   const resetRegForm = () => {
     setShowRegForm(false);
     setRegError("");
+    setRegPatientType("student");
     setRegTitle("นาย");
     setRegFirstName("");
     setRegLastName("");
@@ -272,6 +245,8 @@ export default function PatientsPage() {
     setRegFaculty("");
     setRegDepartment("");
     setRegBirthDate("");
+    setRegNationalId("");
+    setRegPosition("");
   };
 
   const handleCreateVisit = async () => {
@@ -376,6 +351,7 @@ export default function PatientsPage() {
 
           {/* Inline registration form */}
           {showRegForm && <InlineRegForm
+            regPatientType={regPatientType} setRegPatientType={setRegPatientType}
             regTitle={regTitle} setRegTitle={setRegTitle}
             regFirstName={regFirstName} setRegFirstName={setRegFirstName}
             regLastName={regLastName} setRegLastName={setRegLastName}
@@ -384,6 +360,8 @@ export default function PatientsPage() {
             regFaculty={regFaculty} setRegFaculty={setRegFaculty}
             regDepartment={regDepartment} setRegDepartment={setRegDepartment}
             regBirthDate={regBirthDate} setRegBirthDate={setRegBirthDate}
+            regNationalId={regNationalId} setRegNationalId={setRegNationalId}
+            regPosition={regPosition} setRegPosition={setRegPosition}
             registering={registering} regError={regError}
             onRegister={handleRegister} onClose={resetRegForm}
           />}
@@ -574,9 +552,10 @@ export default function PatientsPage() {
           {/* Tabs */}
           <div className="flex bg-gray-100 dark:bg-gray-900 rounded-xl p-1 gap-1">
             {([
-              { key: "queue" as const, label: "คิวผู้ป่วย", icon: Activity },
               { key: "history" as const, label: "ประวัติการรักษา", icon: ClipboardList },
-              { key: "students" as const, label: "นักศึกษาทั้งหมด", icon: GraduationCap },
+              { key: "students" as const, label: "นักศึกษา", icon: GraduationCap },
+              { key: "staff" as const, label: "บุคลากร", icon: Briefcase },
+              { key: "external" as const, label: "บุคคลภายนอก", icon: UserRound },
             ] as const).map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -593,35 +572,27 @@ export default function PatientsPage() {
             ))}
           </div>
 
-          {/* Search for history/students */}
-          {tab !== "queue" && (
-            <div className="relative flex-1 min-w-[200px]">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                value={listSearch}
-                onChange={(e) => setListSearch(e.target.value)}
-                placeholder={tab === "students" ? "ค้นหาชื่อ / รหัสนักศึกษา / อีเมล..." : "ค้นหาชื่อ / รหัสนักศึกษา..."}
-                className="w-full pl-9 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:text-white dark:placeholder-gray-500"
-              />
-            </div>
-          )}
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={listSearch}
+              onChange={(e) => setListSearch(e.target.value)}
+              placeholder={tab === "history" ? "ค้นหาชื่อ / รหัสนักศึกษา..." : "ค้นหาชื่อ / รหัส / อีเมล..."}
+              className="w-full pl-9 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:text-white dark:placeholder-gray-500"
+            />
+          </div>
         </div>
 
         {/* Tab content */}
-        {tab === "queue" ? (
-          /* Duplicate queue reference — scroll up hint */
-          <div className="py-8 text-center">
-            <Activity size={28} className="mx-auto text-gray-200 dark:text-gray-600 mb-2" />
-            <p className="text-sm text-gray-400">ดูคิวผู้ป่วยด้านบน</p>
-          </div>
-        ) : tab === "history" ? (
+        {tab === "history" ? (
           <HistoryTable visits={visits} loading={loadingList} page={page} />
         ) : (
-          <StudentsTable students={students} loading={loadingList} page={page} />
+          <UsersTable users={students} loading={loadingList} page={page} tab={tab} />
         )}
 
         {/* Pagination for history/students */}
-        {tab !== "queue" && totalPages > 1 && (
+        {totalPages > 1 && (
           <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-500">
               แสดง {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} จาก {total}
@@ -659,6 +630,7 @@ export default function PatientsPage() {
    ═══════════════════════════════════════════════════════ */
 
 function InlineRegForm({
+  regPatientType, setRegPatientType,
   regTitle, setRegTitle,
   regFirstName, setRegFirstName,
   regLastName, setRegLastName,
@@ -667,9 +639,12 @@ function InlineRegForm({
   regFaculty, setRegFaculty,
   regDepartment, setRegDepartment,
   regBirthDate, setRegBirthDate,
+  regNationalId, setRegNationalId,
+  regPosition, setRegPosition,
   registering, regError,
   onRegister, onClose,
 }: {
+  regPatientType: "student" | "staff_member" | "external"; setRegPatientType: (v: "student" | "staff_member" | "external") => void;
   regTitle: string; setRegTitle: (v: string) => void;
   regFirstName: string; setRegFirstName: (v: string) => void;
   regLastName: string; setRegLastName: (v: string) => void;
@@ -678,9 +653,12 @@ function InlineRegForm({
   regFaculty: string; setRegFaculty: (v: string) => void;
   regDepartment: string; setRegDepartment: (v: string) => void;
   regBirthDate: string; setRegBirthDate: (v: string) => void;
+  regNationalId: string; setRegNationalId: (v: string) => void;
+  regPosition: string; setRegPosition: (v: string) => void;
   registering: boolean; regError: string;
   onRegister: () => void; onClose: () => void;
 }) {
+  const { facultyDepartments: FACULTY_DEPARTMENTS } = useFaculties();
   const inputCls = "w-full px-3 py-2.5 border border-blue-200 dark:border-blue-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white dark:bg-gray-900 dark:text-white";
 
   return (
@@ -694,6 +672,34 @@ function InlineRegForm({
         </button>
       </div>
 
+      {/* Patient type selector — FIRST */}
+      <div>
+        <label className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1.5 block">ประเภทผู้ป่วย *</label>
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            { value: "student" as const, label: "นักศึกษา", icon: <GraduationCap size={16} /> },
+            { value: "staff_member" as const, label: "บุคลากร", icon: <Briefcase size={16} /> },
+            { value: "external" as const, label: "บุคคลภายนอก", icon: <UserRound size={16} /> },
+          ]).map(({ value, label, icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => { setRegPatientType(value); setRegStudentId(""); setRegNationalId(""); setRegPosition(""); }}
+              className={cn(
+                "flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 text-xs font-medium transition-all",
+                regPatientType === value
+                  ? "border-blue-500 bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300"
+                  : "border-blue-100 dark:border-blue-800 bg-white/50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 hover:border-blue-300"
+              )}
+            >
+              {icon}
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Title + First name + Last name */}
       <div className="grid grid-cols-[auto_1fr_1fr] gap-2">
         <div>
           <label className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1 block">คำนำหน้า *</label>
@@ -713,30 +719,61 @@ function InlineRegForm({
         </div>
       </div>
 
-      <div>
-        <label className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1 block">
-          รหัสนักศึกษา * <span className="font-normal text-blue-500">(ใช้เป็นรหัสผ่านตั้งต้น)</span>
-        </label>
-        <input value={regStudentId} onChange={(e) => setRegStudentId(e.target.value)} placeholder="เช่น 6501012345" className={inputCls} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
+      {/* Student-specific: รหัสนักศึกษา */}
+      {regPatientType === "student" && (
         <div>
-          <label className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1 block">คณะ</label>
-          <select value={regFaculty} onChange={(e) => { setRegFaculty(e.target.value); setRegDepartment(""); }} className={inputCls}>
-            <option value="">-- ไม่ระบุ --</option>
-            {Object.keys(FACULTY_DEPARTMENTS).map((f) => <option key={f}>{f}</option>)}
-          </select>
+          <label className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1 block">
+            รหัสนักศึกษา * <span className="font-normal text-blue-500">(ใช้เป็นรหัสผ่านตั้งต้น)</span>
+          </label>
+          <input value={regStudentId} onChange={(e) => setRegStudentId(e.target.value)} placeholder="เช่น 6501012345" className={inputCls} />
         </div>
-        <div>
-          <label className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1 block">สาขาวิชา</label>
-          <select value={regDepartment} onChange={(e) => setRegDepartment(e.target.value)} disabled={!regFaculty} className={cn(inputCls, "disabled:opacity-50 disabled:cursor-not-allowed")}>
-            <option value="">{regFaculty ? "-- เลือกสาขา --" : "-- เลือกคณะก่อน --"}</option>
-            {(FACULTY_DEPARTMENTS[regFaculty] ?? []).map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
-        </div>
-      </div>
+      )}
 
+      {/* Staff-specific: ตำแหน่ง + รหัสพนักงาน */}
+      {regPatientType === "staff_member" && (
+        <>
+          <div>
+            <label className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1 block">ตำแหน่ง</label>
+            <input value={regPosition} onChange={(e) => setRegPosition(e.target.value)} placeholder="เช่น อาจารย์, แม่บ้าน, ช่างเทคนิค" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1 block">รหัสพนักงาน (ถ้ามี)</label>
+            <input value={regStudentId} onChange={(e) => setRegStudentId(e.target.value)} placeholder="เช่น EMP-001" className={inputCls} />
+          </div>
+        </>
+      )}
+
+      {/* External-specific: เลขบัตร ปชช. */}
+      {regPatientType === "external" && (
+        <div>
+          <label className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1 block">เลขบัตรประชาชน (ถ้ามี)</label>
+          <input value={regNationalId} onChange={(e) => setRegNationalId(e.target.value)} placeholder="x-xxxx-xxxxx-xx-x" maxLength={13} className={inputCls} />
+        </div>
+      )}
+
+      {/* Faculty — show for student & staff_member */}
+      {regPatientType !== "external" && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1 block">
+              {regPatientType === "staff_member" ? "สังกัด/หน่วยงาน" : "คณะ"}
+            </label>
+            <select value={regFaculty} onChange={(e) => { setRegFaculty(e.target.value); setRegDepartment(""); }} className={inputCls}>
+              <option value="">-- ไม่ระบุ --</option>
+              {Object.keys(FACULTY_DEPARTMENTS).map((f) => <option key={f}>{f}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1 block">สาขาวิชา</label>
+            <select value={regDepartment} onChange={(e) => setRegDepartment(e.target.value)} disabled={!regFaculty} className={cn(inputCls, "disabled:opacity-50 disabled:cursor-not-allowed")}>
+              <option value="">{regFaculty ? "-- เลือกสาขา --" : "-- เลือกคณะก่อน --"}</option>
+              {(FACULTY_DEPARTMENTS[regFaculty] ?? []).map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Birth date + auto age */}
       <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
         <div>
           <label className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1 block">วันเกิด (ถ้ามี)</label>
@@ -765,16 +802,13 @@ function InlineRegForm({
 
       <button
         onClick={onRegister}
-        disabled={registering || !regFirstName.trim() || !regLastName.trim() || !regStudentId.trim()}
+        disabled={registering || !regFirstName.trim() || !regLastName.trim() || (regPatientType === "student" && !regStudentId.trim())}
         className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2"
       >
         {registering ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
         {registering ? "กำลังลงทะเบียน..." : "ลงทะเบียนและเลือก"}
       </button>
 
-      <p className="text-xs text-blue-600 dark:text-blue-400 text-center">
-        อีเมลจะถูกสร้างอัตโนมัติ · นักศึกษาสามารถเปลี่ยนรหัสผ่านได้ภายหลัง
-      </p>
     </div>
   );
 }
@@ -840,13 +874,27 @@ function HistoryTable({ visits, loading, page }: { visits: PatientVisit[]; loadi
    Students Table
    ═══════════════════════════════════════════════════════ */
 
-function StudentsTable({ students, loading, page }: { students: StudentUser[]; loading: boolean; page: number }) {
+function UsersTable({ users, loading, page, tab }: { users: StudentUser[]; loading: boolean; page: number; tab: string }) {
+  const headers = tab === "students"
+    ? ["#", "นักศึกษา", "รหัสนักศึกษา", "คณะ / ชั้นปี", "สถานะ", ""]
+    : tab === "staff"
+    ? ["#", "บุคลากร", "รหัสพนักงาน", "ตำแหน่ง / สังกัด", "สถานะ", ""]
+    : ["#", "บุคคลภายนอก", "เบอร์โทร", "ข้อมูลเพิ่มเติม", "สถานะ", ""];
+
+  const emptyLabel = tab === "students" ? "ไม่พบนักศึกษา" : tab === "staff" ? "ไม่พบบุคลากร" : "ไม่พบบุคคลภายนอก";
+  const EmptyIcon = tab === "students" ? GraduationCap : tab === "staff" ? Briefcase : UserRound;
+  const avatarGradient = tab === "students"
+    ? "from-blue-400 to-blue-600"
+    : tab === "staff"
+    ? "from-emerald-400 to-emerald-600"
+    : "from-amber-400 to-amber-600";
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-            {["#", "นักศึกษา", "รหัสนักศึกษา", "คณะ / ชั้นปี", "สถานะ", ""].map((h, i) => (
+            {headers.map((h, i) => (
               <th key={i} className="text-left px-5 py-3 text-sm font-semibold text-gray-500 dark:text-gray-400">{h}</th>
             ))}
           </tr>
@@ -856,17 +904,17 @@ function StudentsTable({ students, loading, page }: { students: StudentUser[]; l
             <tr><td colSpan={6} className="py-12 text-center">
               <Loader2 size={24} className="animate-spin text-gray-300 mx-auto" />
             </td></tr>
-          ) : students.length === 0 ? (
+          ) : users.length === 0 ? (
             <tr><td colSpan={6} className="py-12 text-center">
-              <GraduationCap size={28} className="mx-auto text-gray-200 dark:text-gray-600 mb-2" />
-              <p className="text-sm text-gray-400">ไม่พบนักศึกษา</p>
+              <EmptyIcon size={28} className="mx-auto text-gray-200 dark:text-gray-600 mb-2" />
+              <p className="text-sm text-gray-400">{emptyLabel}</p>
             </td></tr>
-          ) : students.map((s, idx) => (
+          ) : users.map((s, idx) => (
             <tr key={s.id} className="hover:bg-gray-50/60 dark:hover:bg-gray-700/30 transition-colors">
               <td className="px-5 py-3.5 text-sm text-gray-400">{(page - 1) * PAGE_SIZE + idx + 1}</td>
               <td className="px-5 py-3.5">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                  <div className={cn("w-9 h-9 rounded-full bg-gradient-to-br flex items-center justify-center text-white text-xs font-bold flex-shrink-0", avatarGradient)}>
                     {s.firstName[0]}{s.lastName[0]}
                   </div>
                   <div>
@@ -875,8 +923,11 @@ function StudentsTable({ students, loading, page }: { students: StudentUser[]; l
                   </div>
                 </div>
               </td>
+              {/* Column 3: ID / phone */}
               <td className="px-5 py-3.5">
-                {s.studentId ? (
+                {tab === "external" ? (
+                  <span className="text-sm text-gray-600 dark:text-gray-300">{s.phone || "—"}</span>
+                ) : s.studentId ? (
                   <span className="font-mono text-sm bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-lg">
                     {s.studentId}
                   </span>
@@ -884,14 +935,24 @@ function StudentsTable({ students, loading, page }: { students: StudentUser[]; l
                   <span className="text-sm text-gray-300">—</span>
                 )}
               </td>
+              {/* Column 4: info */}
               <td className="px-5 py-3.5">
-                {s.department || s.yearOfStudy ? (
+                {tab === "staff" ? (
+                  <div>
+                    {s.position && <p className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-[180px]">{s.position}</p>}
+                    {s.faculty && <p className="text-sm text-gray-400">{s.faculty}</p>}
+                    {!s.position && !s.faculty && <span className="text-sm text-gray-300">—</span>}
+                  </div>
+                ) : tab === "external" ? (
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    {s.faculty || s.department || "—"}
+                  </span>
+                ) : (
                   <div>
                     {s.department && <p className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-[180px]">{s.department}</p>}
                     {s.yearOfStudy && <p className="text-sm text-gray-400">ชั้นปีที่ {s.yearOfStudy}</p>}
+                    {!s.department && !s.yearOfStudy && <span className="text-sm text-gray-300">—</span>}
                   </div>
-                ) : (
-                  <span className="text-sm text-gray-300">—</span>
                 )}
               </td>
               <td className="px-5 py-3.5">

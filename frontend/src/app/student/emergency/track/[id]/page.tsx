@@ -60,17 +60,34 @@ function getInitials(first: string, last: string) {
   return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
 }
 
+interface EmergencyContact {
+  id: string;
+  name: string;
+  category: string;
+  phone: string;
+  note?: string;
+}
+
 export default function TrackIncidentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [incident, setIncident] = useState<IncidentDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [contacts, setContacts] = useState<EmergencyContact[]>([]);
+  const [infirmaryPhone, setInfirmaryPhone] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<IncidentDetail>(`/incidents/${id}`).then((res) => {
       if (res.success && res.data) setIncident(res.data);
       else setError("ไม่พบข้อมูลเหตุการณ์");
       setLoading(false);
+    });
+    // Fetch emergency contacts & infirmary phone
+    api.get<EmergencyContact[]>("/emergency-contacts").then((res) => {
+      if (res.success && Array.isArray(res.data)) setContacts(res.data);
+    });
+    api.get<{ name: string; phone: string | null }>("/settings/infirmary").then((res) => {
+      if (res.success && res.data?.phone) setInfirmaryPhone(res.data.phone);
     });
   }, [id]);
 
@@ -116,7 +133,7 @@ export default function TrackIncidentPage({ params }: { params: Promise<{ id: st
     <div className="min-h-screen bg-gray-50">
       {/* Hero Header */}
       <div className={cn(
-        "relative overflow-hidden px-4 pt-12 pb-8 text-white text-center",
+        "relative overflow-hidden px-4 pb-6 text-white text-center student-header",
         isCompleted
           ? "bg-gradient-to-br from-emerald-500 via-green-600 to-teal-700"
           : "bg-gradient-to-br from-red-500 via-rose-600 to-red-700"
@@ -134,26 +151,26 @@ export default function TrackIncidentPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* Status icon */}
-        <div className="relative z-10 flex justify-center mb-4">
+        <div className="relative z-10 flex justify-center mb-3">
           {isCompleted ? (
-            <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center">
-              <div className="w-14 h-14 bg-white/30 rounded-full flex items-center justify-center">
-                <CheckCircle2 size={32} className="text-white" />
+            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+              <div className="w-11 h-11 bg-white/30 rounded-full flex items-center justify-center">
+                <CheckCircle2 size={26} className="text-white" />
               </div>
             </div>
           ) : (
             <div className="relative">
-              <div className="absolute inset-0 w-20 h-20 bg-white/20 rounded-full animate-ping" />
-              <div className="relative w-20 h-20 bg-white/20 rounded-full flex items-center justify-center">
-                <div className="w-14 h-14 bg-white/30 rounded-full flex items-center justify-center">
-                  <Siren size={28} className="text-white animate-pulse" />
+              <div className="absolute inset-0 w-16 h-16 bg-white/20 rounded-full animate-ping" />
+              <div className="relative w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+                <div className="w-11 h-11 bg-white/30 rounded-full flex items-center justify-center">
+                  <Siren size={22} className="text-white animate-pulse" />
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        <h1 className="relative z-10 text-xl font-bold mb-1">
+        <h1 className="relative z-10 text-lg font-bold mb-1">
           {isCompleted ? "ได้รับการช่วยเหลือแล้ว" : "กำลังรอความช่วยเหลือ"}
         </h1>
         <p className="relative z-10 text-white/70 text-xs">
@@ -169,10 +186,10 @@ export default function TrackIncidentPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
-      <div className="px-4 py-4 space-y-3 -mt-2">
+      <div className="px-3 py-3 space-y-2.5 -mt-2">
 
         {/* Status timeline */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-100">
           <h2 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <div className="w-5 h-5 bg-blue-100 rounded-lg flex items-center justify-center">
               <Clock size={12} className="text-blue-600" />
@@ -236,7 +253,7 @@ export default function TrackIncidentPage({ params }: { params: Promise<{ id: st
 
         {/* Responder */}
         {incident.responder && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-100">
             <h2 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
               <div className="w-5 h-5 bg-emerald-100 rounded-lg flex items-center justify-center">
                 <User size={12} className="text-emerald-600" />
@@ -267,7 +284,7 @@ export default function TrackIncidentPage({ params }: { params: Promise<{ id: st
         )}
 
         {/* Incident details */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-100">
           <h2 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
             <div className="w-5 h-5 bg-gray-100 rounded-lg flex items-center justify-center">
               <Siren size={12} className="text-gray-600" />
@@ -321,44 +338,51 @@ export default function TrackIncidentPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* Emergency contacts */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <div className="w-5 h-5 bg-red-100 rounded-lg flex items-center justify-center">
-              <Phone size={12} className="text-red-500" />
+        {(infirmaryPhone || contacts.length > 0) && (
+          <div className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-100">
+            <h2 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <div className="w-5 h-5 bg-red-100 rounded-lg flex items-center justify-center">
+                <Phone size={12} className="text-red-500" />
+              </div>
+              เบอร์ฉุกเฉิน
+            </h2>
+            <div className="grid gap-2">
+              {infirmaryPhone && (
+                <a
+                  href={`tel:${infirmaryPhone}`}
+                  className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 hover:bg-blue-100 active:scale-95 rounded-xl px-3 py-3 transition-all"
+                >
+                  <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Phone size={14} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-blue-400">ห้องพยาบาล</p>
+                    <p className="text-sm font-bold text-blue-700">{infirmaryPhone}</p>
+                  </div>
+                </a>
+              )}
+              {contacts.map((c) => (
+                <a
+                  key={c.id}
+                  href={`tel:${c.phone}`}
+                  className="flex items-center gap-2.5 bg-red-50 border border-red-100 hover:bg-red-100 active:scale-95 rounded-xl px-3 py-3 transition-all"
+                >
+                  <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Phone size={14} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-red-400">{c.category === "hospital" ? "โรงพยาบาล" : c.category === "police" ? "ตำรวจ" : c.category === "rescue" ? "กู้ชีพ" : c.category === "fire" ? "ดับเพลิง" : "อื่นๆ"}</p>
+                    <p className="text-sm font-bold text-red-700">{c.name} — {c.phone}</p>
+                  </div>
+                </a>
+              ))}
             </div>
-            เบอร์ฉุกเฉิน
-          </h2>
-          <div className="grid grid-cols-2 gap-2">
-            <a
-              href="tel:191"
-              className="flex items-center gap-2.5 bg-red-50 border border-red-100 hover:bg-red-100 active:scale-95 rounded-xl px-3 py-3 transition-all"
-            >
-              <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Phone size={14} className="text-white" />
-              </div>
-              <div>
-                <p className="text-[10px] text-red-400">โทรฉุกเฉิน</p>
-                <p className="text-sm font-bold text-red-700">191</p>
-              </div>
-            </a>
-            <a
-              href="tel:02-xxx-xxxx"
-              className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 hover:bg-blue-100 active:scale-95 rounded-xl px-3 py-3 transition-all"
-            >
-              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Phone size={14} className="text-white" />
-              </div>
-              <div>
-                <p className="text-[10px] text-blue-400">ห้องพยาบาล</p>
-                <p className="text-sm font-bold text-blue-700">พยาบาล</p>
-              </div>
-            </a>
           </div>
-        </div>
+        )}
 
         <Link
           href="/student/dashboard"
-          className="flex items-center justify-center gap-2 py-3.5 text-sm text-gray-500 hover:text-gray-700 bg-white rounded-2xl border border-gray-100 shadow-sm active:scale-[0.98] transition-all"
+          className="flex items-center justify-center gap-2 py-3 text-xs text-gray-500 hover:text-gray-700 bg-white rounded-xl border border-gray-100 shadow-sm active:scale-[0.98] transition-all"
         >
           <Home size={15} /> กลับหน้าหลัก
         </Link>

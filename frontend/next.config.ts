@@ -14,8 +14,24 @@ const nextConfig: NextConfig = {
         hostname: "localhost",
       },
       {
+        protocol: "https",
+        hostname: "localhost",
+      },
+      {
         protocol: "http",
         hostname: "iot666.ddns.net",
+      },
+      {
+        protocol: "https",
+        hostname: "iot666.ddns.net",
+      },
+      {
+        protocol: "http",
+        hostname: "**",
+      },
+      {
+        protocol: "https",
+        hostname: "**",
       },
     ],
   },

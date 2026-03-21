@@ -149,7 +149,16 @@ export class UsersService {
     const values: unknown[] = [];
     let idx = 1;
 
-    if (dto.role) {
+    if (dto.patientType) {
+      // patientType overrides role filter
+      if (dto.patientType === 'student') {
+        conditions.push(`role = 'student'::user_role AND student_id IS NOT NULL`);
+      } else if (dto.patientType === 'staff_member') {
+        conditions.push(`role = 'staff'::user_role`);
+      } else if (dto.patientType === 'external') {
+        conditions.push(`role = 'student'::user_role AND student_id IS NULL`);
+      }
+    } else if (dto.role) {
       conditions.push(`role = $${idx++}::user_role`);
       values.push(dto.role);
     }

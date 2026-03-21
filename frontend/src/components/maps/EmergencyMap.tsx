@@ -32,13 +32,14 @@ export function EmergencyMap({
   const leafletRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersRef = useRef<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const infirmaryMarkerRef = useRef<any>(null);
   // Signals that the map is initialized — triggers the marker effect to re-run
   const [mapReady, setMapReady] = useState(false);
 
+  // Initialize map (once)
   useEffect(() => {
-    // Dynamically import Leaflet (no SSR)
     import("leaflet").then((L) => {
-      // Fix default icons
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
@@ -60,7 +61,36 @@ export function EmergencyMap({
         maxZoom: 19,
       }).addTo(map);
 
-      // Infirmary marker
+      leafletRef.current = map;
+      setMapReady(true);
+    });
+
+    return () => {
+      if (leafletRef.current) {
+        leafletRef.current.remove();
+        leafletRef.current = null;
+      }
+      infirmaryMarkerRef.current = null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (window as any).__emergencyMapCallbacks;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Infirmary marker — reactive to lat/lng/name changes (e.g. when API data arrives)
+  useEffect(() => {
+    if (!leafletRef.current) return;
+
+    import("leaflet").then((L) => {
+      const map = leafletRef.current;
+      if (!map) return;
+
+      // Remove old infirmary marker
+      if (infirmaryMarkerRef.current) {
+        infirmaryMarkerRef.current.remove();
+        infirmaryMarkerRef.current = null;
+      }
+
       const infirmaryIcon = L.divIcon({
         html: `<div style="
           width:32px;height:32px;
@@ -76,23 +106,12 @@ export function EmergencyMap({
         iconAnchor: [16, 16],
       });
 
-      L.marker([infirmaryLat, infirmaryLng], { icon: infirmaryIcon })
+      infirmaryMarkerRef.current = L.marker([infirmaryLat, infirmaryLng], { icon: infirmaryIcon })
         .addTo(map)
         .bindPopup(`<b>${infirmaryName}</b>`)
         .openPopup();
-
-      leafletRef.current = map;
-      setMapReady(true); // notify marker effect that map is ready
     });
-
-    return () => {
-      if (leafletRef.current) {
-        leafletRef.current.remove();
-        leafletRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [infirmaryLat, infirmaryLng, infirmaryName, mapReady]);
 
   // Update markers when incidents change — also re-runs when mapReady flips true,
   // which handles the race condition where incidents arrive before Leaflet finishes loading.
@@ -111,6 +130,10 @@ export function EmergencyMap({
       if (validIncidents.length === 0) return;
 
       const bounds: [number, number][] = [[infirmaryLat, infirmaryLng]];
+
+      // Store callbacks on window so popup buttons can invoke them
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const callbackMap = ((window as any).__emergencyMapCallbacks = {} as Record<string, () => void>);
 
       validIncidents.forEach((incident) => {
         const lat = incident.latitude!;
@@ -134,6 +157,9 @@ export function EmergencyMap({
           iconAnchor: [isSelected ? 20 : 16, isSelected ? 40 : 32],
         });
 
+        // Register callback for this incident's popup button
+        callbackMap[incident.id] = () => onSelectIncident(incident);
+
         const marker = L.marker([lat, lng], { icon })
           .addTo(map)
           .bindPopup(
@@ -141,12 +167,15 @@ export function EmergencyMap({
               <b style="color:${color}">${getSeverityLabel(incident.severity)}</b>
               <p style="margin:4px 0 0;font-size:13px">${getTypeLabel(incident.incidentType)}</p>
               ${incident.distanceKm != null ? `<p style="margin:2px 0 0;font-size:12px;color:#666">ระยะ ${incident.distanceKm.toFixed(2)} กม.</p>` : ""}
-              <p style="margin:4px 0 0;font-size:11px;color:#888">คลิกที่หมุดเพื่อดูรายละเอียด</p>
+              <button onclick="window.__emergencyMapCallbacks['${incident.id}']()" style="
+                margin-top:8px;width:100%;padding:6px 0;
+                background:${color};color:white;border:none;border-radius:6px;
+                font-size:13px;font-weight:600;cursor:pointer;
+              ">ดูรายละเอียด / รับเหตุ</button>
             </div>`,
             { maxWidth: 220 }
           );
 
-        marker.on("click", () => onSelectIncident(incident));
         markersRef.current.push(marker);
         bounds.push([lat, lng]);
       });

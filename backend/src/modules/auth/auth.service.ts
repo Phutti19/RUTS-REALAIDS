@@ -36,13 +36,13 @@ export class AuthService {
 
   // ── Public methods ──────────────────────────────────────────────────────────
 
-  async login(dto: LoginDto, ipAddress: string): Promise<TokenResponse> {
+  async login(dto: LoginDto, ipAddress: string, userAgent?: string | null): Promise<TokenResponse> {
     const { email, password } = dto;
 
     // 1. Brute-force check before hitting users table
     const failedCount = await this.countRecentFailures(email);
     if (failedCount >= MAX_FAILED_ATTEMPTS) {
-      await this.recordAttempt(email, ipAddress, false, 'ACCOUNT_LOCKED');
+      await this.recordAttempt(email, ipAddress, userAgent, false, 'ACCOUNT_LOCKED');
       throw new UnauthorizedException(
         `Too many failed attempts. Account locked for ${LOCK_WINDOW_MINUTES} minutes.`,
       );
@@ -56,19 +56,19 @@ export class AuthService {
     );
 
     if (!user) {
-      await this.recordAttempt(email, ipAddress, false, 'USER_NOT_FOUND');
+      await this.recordAttempt(email, ipAddress, userAgent, false, 'USER_NOT_FOUND');
       throw new UnauthorizedException('Invalid email or password');
     }
 
     if (!user.is_active) {
-      await this.recordAttempt(email, ipAddress, false, 'ACCOUNT_INACTIVE');
+      await this.recordAttempt(email, ipAddress, userAgent, false, 'ACCOUNT_INACTIVE');
       throw new UnauthorizedException('Account is inactive. Please contact an administrator.');
     }
 
     // 3. Verify password (bcryptjs compare)
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) {
-      await this.recordAttempt(email, ipAddress, false, 'WRONG_PASSWORD');
+      await this.recordAttempt(email, ipAddress, userAgent, false, 'WRONG_PASSWORD');
       const remaining = MAX_FAILED_ATTEMPTS - (failedCount + 1);
       const hint =
         remaining > 0
@@ -78,10 +78,10 @@ export class AuthService {
     }
 
     // 4. Record success and issue tokens
-    await this.recordAttempt(email, ipAddress, true, null);
+    await this.recordAttempt(email, ipAddress, userAgent, true, null);
     this.logger.log(`Login success: userId=${user.id} role=${user.role} ip=${ipAddress}`);
 
-    return this.issueTokens(user);
+    return this.issueTokens(user, userAgent);
   }
 
   async register(dto: RegisterDto): Promise<{ message: string }> {
@@ -319,7 +319,7 @@ export class AuthService {
 
   // ── Private helpers ─────────────────────────────────────────────────────────
 
-  private async issueTokens(user: UserRow): Promise<TokenResponse> {
+  private async issueTokens(user: UserRow, deviceInfo?: string | null): Promise<TokenResponse> {
     const accessToken = this.signAccessToken(user.id, user.role);
 
     const rawRefreshToken = randomUUID();
@@ -329,9 +329,9 @@ export class AuthService {
     );
 
     await this.db.query(
-      `INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
-       VALUES ($1, $2, $3)`,
-      [user.id, tokenHash, expiresAt],
+      `INSERT INTO refresh_tokens (user_id, token_hash, expires_at, device_info)
+       VALUES ($1, $2, $3, $4)`,
+      [user.id, tokenHash, expiresAt, deviceInfo ?? null],
     );
 
     const authUser: AuthUser = {
@@ -374,8 +374,8 @@ export class AuthService {
        FROM login_attempts
        WHERE email = $1
          AND success = false
-         AND created_at > NOW() - INTERVAL '${LOCK_WINDOW_MINUTES} minutes'`,
-      [email],
+         AND created_at > NOW() - ($2 || ' minutes')::interval`,
+      [email, LOCK_WINDOW_MINUTES],
     );
     return parseInt(row?.count ?? '0', 10);
   }
@@ -383,14 +383,15 @@ export class AuthService {
   private async recordAttempt(
     email: string,
     ipAddress: string,
+    userAgent: string | null | undefined,
     success: boolean,
     failureReason: string | null,
   ): Promise<void> {
     try {
       await this.db.query(
-        `INSERT INTO login_attempts (email, ip_address, success, failure_reason)
-         VALUES ($1, $2::inet, $3, $4)`,
-        [email, ipAddress, success, failureReason],
+        `INSERT INTO login_attempts (email, ip_address, user_agent, success, failure_reason)
+         VALUES ($1, $2::inet, $3, $4, $5)`,
+        [email, ipAddress, userAgent ?? null, success, failureReason],
       );
     } catch (err: unknown) {
       // Never let audit logging break the auth flow

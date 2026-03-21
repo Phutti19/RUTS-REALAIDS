@@ -30,7 +30,7 @@ export class SettingsController {
    * Accessible by both staff and admin (used on emergency map).
    */
   @Get('infirmary')
-  @Roles('staff', 'admin')
+  @Roles('student', 'staff', 'admin')
   async getInfirmaryInfo() {
     const data = await this.settingsService.getInfirmaryInfo();
     return { success: true, data };

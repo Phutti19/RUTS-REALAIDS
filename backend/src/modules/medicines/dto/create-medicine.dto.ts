@@ -16,6 +16,12 @@ export class CreateMedicineDto {
   @Transform(({ value }: { value: string }) => value?.trim())
   name: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @Transform(({ value }: { value: string }) => value?.trim())
+  genericName?: string | null;
+
   @IsEnum(['medicine', 'supply', 'equipment'])
   category: string;
 
@@ -31,6 +37,13 @@ export class CreateMedicineDto {
   @MaxLength(50)
   @Transform(({ value }: { value: string }) => value?.trim())
   unit?: string | null;
+
+  /** Storage location e.g. "Cabinet A", "Shelf 3" */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Transform(({ value }: { value: string }) => value?.trim())
+  location?: string | null;
 
   /** Threshold below which a low-stock alert is triggered */
   @IsOptional()

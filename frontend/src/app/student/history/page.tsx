@@ -71,16 +71,16 @@ export default function HistoryPage() {
   return (
     <div className="bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 pt-3 sticky top-0 z-10">
-        <div className="flex items-center gap-3 pb-3">
+      <div className="bg-white border-b border-gray-200 px-3 pt-2.5 sticky top-0 z-10">
+        <div className="flex items-center gap-2.5 pb-2.5">
           <Link href="/student/dashboard" className="p-1 hover:bg-gray-100 rounded-lg">
-            <ArrowLeft size={20} />
+            <ArrowLeft size={18} />
           </Link>
-          <h1 className="font-semibold text-gray-800">ประวัติ</h1>
+          <h1 className="font-semibold text-sm text-gray-800">ประวัติ</h1>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-4 text-sm font-medium">
+        <div className="flex gap-4 text-xs font-medium">
           <button
             onClick={() => setTab("incidents")}
             className={cn(
@@ -106,7 +106,7 @@ export default function HistoryPage() {
         </div>
       </div>
 
-      <div className="px-4 py-4 space-y-3">
+      <div className="px-3 py-3 space-y-2.5">
         {/* ── Incidents tab ── */}
         {tab === "incidents" && (
           <>

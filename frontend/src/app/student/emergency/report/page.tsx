@@ -12,7 +12,6 @@ import {
   Navigation,
   Siren,
   MapPin,
-  Phone,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -145,29 +144,23 @@ export default function EmergencyReportPage() {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-gradient-to-br from-red-700 via-red-800 to-rose-900 text-white px-5 pt-4 pb-5 sticky top-0 z-10 shadow-lg shadow-red-900/30">
-        <div className="flex items-center gap-3 mb-4">
+      <div className="bg-gradient-to-br from-red-700 via-red-800 to-rose-900 text-white px-4 pt-3 pb-4 sticky top-0 z-10 shadow-lg shadow-red-900/30">
+        <div className="flex items-center gap-2.5 mb-3">
           <button
             onClick={() => router.back()}
-            className="p-1.5 hover:bg-white/10 rounded-xl transition-colors active:scale-95"
+            className="p-1 hover:bg-white/10 rounded-lg transition-colors active:scale-95"
           >
-            <ArrowLeft size={22} />
+            <ArrowLeft size={20} />
           </button>
-          <div className="flex-1 min-w-0 flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-              <Siren size={17} className="animate-pulse" />
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center">
+              <Siren size={15} className="animate-pulse" />
             </div>
             <div>
-              <h1 className="font-bold text-lg leading-tight">แจ้งเหตุฉุกเฉิน</h1>
-              <p className="text-red-200 text-sm">กรอกข้อมูลให้ครบก่อนส่ง</p>
+              <h1 className="font-bold text-base leading-tight">แจ้งเหตุฉุกเฉิน</h1>
+              <p className="text-red-200 text-xs">กรอกข้อมูลให้ครบก่อนส่ง</p>
             </div>
           </div>
-          <a
-            href="tel:191"
-            className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl px-3 py-2 text-sm font-semibold transition-colors active:scale-95"
-          >
-            <Phone size={14} /> โทร 191
-          </a>
         </div>
 
         {/* Step progress bar */}
@@ -405,22 +398,22 @@ export default function EmergencyReportPage() {
         )}
 
         {/* Bottom actions */}
-        <div className="fixed bottom-[58px] left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700">
-          <div className="max-w-md mx-auto px-4 py-3">
+        <div className="fixed left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700" style={{ bottom: "calc(60px + env(safe-area-inset-bottom, 0px))" }}>
+          <div className="max-w-md mx-auto px-3 py-2.5">
             <button
               type="submit"
               disabled={!canSubmit}
               className={cn(
-                "w-full py-4 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
+                "w-full py-3.5 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
                 canSubmit
                   ? "bg-gradient-to-r from-red-700 to-rose-700 hover:from-red-800 hover:to-rose-800 text-white shadow-lg shadow-red-300/40"
                   : "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
               )}
             >
               {submitting ? (
-                <><Loader2 size={20} className="animate-spin" /> กำลังส่ง...</>
+                <><Loader2 size={18} className="animate-spin" /> กำลังส่ง...</>
               ) : (
-                <><Siren size={20} /> ส่งแจ้งเหตุ</>
+                <><Siren size={18} /> ส่งแจ้งเหตุ</>
               )}
             </button>
           </div>

@@ -109,7 +109,7 @@ export default function CertificatePage({ params }: { params: Promise<{ id: stri
         <Link href={`/staff/patients/${id}`} className="p-2 hover:bg-gray-100 rounded-xl">
           <ArrowLeft size={18} />
         </Link>
-        <h1 className="text-xl font-bold text-gray-900">ใบรับรองแพทย์</h1>
+        <h1 className="text-xl font-bold text-gray-900">ใบรับรองห้องพยาบาล</h1>
         {certificate && (
           <button
             onClick={handlePrint}
@@ -123,7 +123,7 @@ export default function CertificatePage({ params }: { params: Promise<{ id: stri
       {/* Create form if not exists */}
       {notFound && (
         <div className="bg-white rounded-2xl shadow-sm p-5 space-y-4 print:hidden">
-          <h2 className="font-semibold text-gray-800">ออกใบรับรองแพทย์</h2>
+          <h2 className="font-semibold text-gray-800">ออกใบรับรองห้องพยาบาล</h2>
 
           <div>
             <label className="text-xs text-gray-500 mb-1 block">การวินิจฉัย *</label>
@@ -196,7 +196,7 @@ export default function CertificatePage({ params }: { params: Promise<{ id: stri
         >
           {/* Header */}
           <div className="text-center border-b-2 border-gray-800 pb-4 mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">ใบรับรองแพทย์</h1>
+            <h1 className="text-2xl font-bold text-gray-900">ใบรับรองห้องพยาบาล</h1>
             <p className="text-sm text-gray-600 mt-1">MEDICAL CERTIFICATE</p>
             <p className="text-sm font-semibold mt-2">{infirmaryName}</p>
             <p className="text-xs text-gray-500">Rajamangala University of Technology Srivijaya Infirmary</p>

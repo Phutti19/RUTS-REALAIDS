@@ -219,3 +219,25 @@ html {
 }
 .dark .auth-layout input::placeholder,
 .dark .auth-layout textarea::placeholder { color: rgb(156 163 175); } /* gray-400 */
+
+/* ── Student Portal Mobile Safe-Area & Responsive ─────────────────────────── */
+
+/* Bottom nav: add safe-area-inset-bottom padding for notch/gesture-bar devices */
+.student-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Content wrapper: bottom padding = nav height + safe-area */
+.student-portal-wrapper {
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Student header: use safe-area-inset-top for status bar in PWA standalone mode,
+   but limit padding when inside a browser (status bar already handled) */
+.student-header {
+  padding-top: max(env(safe-area-inset-top, 0px), 12px);
+}
+
+/* No scrollbar utility */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

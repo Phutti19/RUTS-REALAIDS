@@ -21,6 +21,8 @@ import { CreateEmergencyContactDto } from './dto/create-emergency-contact.dto';
 import { UpdateEmergencyContactDto } from './dto/update-emergency-contact.dto';
 import { ListAuditLogsDto } from './dto/list-audit-logs.dto';
 import { CreateTreatmentTypeDto } from './dto/create-treatment-type.dto';
+import { CreateFacultyDto } from './dto/create-faculty.dto';
+import { CreateDepartmentDto } from './dto/create-department.dto';
 import { ListLoginAttemptsDto } from './dto/list-login-attempts.dto';
 import {
   SystemSetting,
@@ -36,6 +38,10 @@ import {
   AuditLogRow,
   TreatmentType,
   TreatmentTypeRow,
+  Faculty,
+  FacultyRow,
+  Department,
+  DepartmentRow,
   LoginAttempt,
   LoginAttemptRow,
 } from './interfaces/settings.interfaces';
@@ -124,6 +130,27 @@ function formatTreatmentType(row: TreatmentTypeRow): TreatmentType {
     id: row.id,
     name: row.name,
     isActive: row.is_active,
+    createdAt: row.created_at,
+  };
+}
+
+function formatFaculty(row: FacultyRow): Faculty {
+  return {
+    id: row.id,
+    name: row.name,
+    isActive: row.is_active,
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+  };
+}
+
+function formatDepartment(row: DepartmentRow): Department {
+  return {
+    id: row.id,
+    facultyId: row.faculty_id,
+    name: row.name,
+    isActive: row.is_active,
+    sortOrder: row.sort_order,
     createdAt: row.created_at,
   };
 }
@@ -620,6 +647,185 @@ export class SettingsService {
     );
     if (!row) throw new NotFoundException('Treatment type not found');
     return formatTreatmentType(row);
+  }
+
+  async deleteTreatmentType(id: string): Promise<void> {
+    const inUse = await this.db.queryOne<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM patient_visits WHERE treatment_type_id = $1`,
+      [id],
+    );
+    if (inUse && parseInt(inUse.count, 10) > 0) {
+      throw new ConflictException('ไม่สามารถลบได้ เนื่องจากมีการใช้งานอยู่ในบันทึกการรักษา');
+    }
+    const affected = await this.db.execute(
+      `DELETE FROM treatment_types WHERE id = $1`,
+      [id],
+    );
+    if (affected === 0) throw new NotFoundException('Treatment type not found');
+  }
+
+  // ── Faculties ──────────────────────────────────────────────────────────────
+
+  async listFaculties(): Promise<Faculty[]> {
+    const faculties = await this.db.queryMany<FacultyRow>(
+      `SELECT id, name, is_active, sort_order, created_at, updated_at
+       FROM faculties ORDER BY sort_order ASC, name ASC`,
+    );
+    const departments = await this.db.queryMany<DepartmentRow>(
+      `SELECT id, faculty_id, name, is_active, sort_order, created_at, updated_at
+       FROM departments ORDER BY sort_order ASC, name ASC`,
+    );
+
+    const deptMap = new Map<string, Department[]>();
+    for (const d of departments) {
+      const list = deptMap.get(d.faculty_id) ?? [];
+      list.push(formatDepartment(d));
+      deptMap.set(d.faculty_id, list);
+    }
+
+    return faculties.map((f) => ({
+      ...formatFaculty(f),
+      departments: deptMap.get(f.id) ?? [],
+    }));
+  }
+
+  async createFaculty(dto: CreateFacultyDto): Promise<Faculty> {
+    const existing = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM faculties WHERE LOWER(name) = LOWER($1)`,
+      [dto.name],
+    );
+    if (existing) throw new ConflictException('ชื่อคณะนี้มีอยู่แล้ว');
+
+    const maxOrder = await this.db.queryOne<{ max: number }>(
+      `SELECT COALESCE(MAX(sort_order), 0) AS max FROM faculties`,
+    );
+
+    const row = await this.db.queryOne<FacultyRow>(
+      `INSERT INTO faculties (id, name, sort_order)
+       VALUES ($1, $2, $3)
+       RETURNING id, name, is_active, sort_order, created_at, updated_at`,
+      [randomUUID(), dto.name, dto.sortOrder ?? (maxOrder!.max + 1)],
+    );
+    return { ...formatFaculty(row!), departments: [] };
+  }
+
+  async updateFaculty(id: string, dto: CreateFacultyDto): Promise<Faculty> {
+    const conflict = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM faculties WHERE LOWER(name) = LOWER($1) AND id != $2`,
+      [dto.name, id],
+    );
+    if (conflict) throw new ConflictException('ชื่อคณะนี้มีอยู่แล้ว');
+
+    const row = await this.db.queryOne<FacultyRow>(
+      `UPDATE faculties SET name = $1, sort_order = COALESCE($2, sort_order), updated_at = now()
+       WHERE id = $3
+       RETURNING id, name, is_active, sort_order, created_at, updated_at`,
+      [dto.name, dto.sortOrder ?? null, id],
+    );
+    if (!row) throw new NotFoundException('ไม่พบคณะ');
+    return formatFaculty(row);
+  }
+
+  async toggleFaculty(id: string): Promise<Faculty> {
+    const row = await this.db.queryOne<FacultyRow>(
+      `UPDATE faculties SET is_active = NOT is_active, updated_at = now()
+       WHERE id = $1
+       RETURNING id, name, is_active, sort_order, created_at, updated_at`,
+      [id],
+    );
+    if (!row) throw new NotFoundException('ไม่พบคณะ');
+    return formatFaculty(row);
+  }
+
+  async deleteFaculty(id: string): Promise<void> {
+    const inUse = await this.db.queryOne<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM users WHERE faculty = (SELECT name FROM faculties WHERE id = $1)`,
+      [id],
+    );
+    if (inUse && parseInt(inUse.count, 10) > 0) {
+      throw new ConflictException('ไม่สามารถลบได้ เนื่องจากมีผู้ใช้ในคณะนี้อยู่');
+    }
+    const affected = await this.db.execute(`DELETE FROM faculties WHERE id = $1`, [id]);
+    if (affected === 0) throw new NotFoundException('ไม่พบคณะ');
+  }
+
+  // ── Departments ───────────────────────────────────────────────────────────
+
+  async createDepartment(dto: CreateDepartmentDto): Promise<Department> {
+    const faculty = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM faculties WHERE id = $1`,
+      [dto.facultyId],
+    );
+    if (!faculty) throw new NotFoundException('ไม่พบคณะ');
+
+    const existing = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM departments WHERE faculty_id = $1 AND LOWER(name) = LOWER($2)`,
+      [dto.facultyId, dto.name],
+    );
+    if (existing) throw new ConflictException('สาขานี้มีอยู่แล้วในคณะ');
+
+    const maxOrder = await this.db.queryOne<{ max: number }>(
+      `SELECT COALESCE(MAX(sort_order), 0) AS max FROM departments WHERE faculty_id = $1`,
+      [dto.facultyId],
+    );
+
+    const row = await this.db.queryOne<DepartmentRow>(
+      `INSERT INTO departments (id, faculty_id, name, sort_order)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, faculty_id, name, is_active, sort_order, created_at, updated_at`,
+      [randomUUID(), dto.facultyId, dto.name, dto.sortOrder ?? (maxOrder!.max + 1)],
+    );
+    return formatDepartment(row!);
+  }
+
+  async updateDepartment(id: string, name: string): Promise<Department> {
+    const dept = await this.db.queryOne<DepartmentRow>(
+      `SELECT id, faculty_id FROM departments WHERE id = $1`,
+      [id],
+    );
+    if (!dept) throw new NotFoundException('ไม่พบสาขา');
+
+    const conflict = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM departments WHERE faculty_id = $1 AND LOWER(name) = LOWER($2) AND id != $3`,
+      [dept.faculty_id, name, id],
+    );
+    if (conflict) throw new ConflictException('สาขานี้มีอยู่แล้วในคณะ');
+
+    const row = await this.db.queryOne<DepartmentRow>(
+      `UPDATE departments SET name = $1, updated_at = now()
+       WHERE id = $2
+       RETURNING id, faculty_id, name, is_active, sort_order, created_at, updated_at`,
+      [name, id],
+    );
+    return formatDepartment(row!);
+  }
+
+  async toggleDepartment(id: string): Promise<Department> {
+    const row = await this.db.queryOne<DepartmentRow>(
+      `UPDATE departments SET is_active = NOT is_active, updated_at = now()
+       WHERE id = $1
+       RETURNING id, faculty_id, name, is_active, sort_order, created_at, updated_at`,
+      [id],
+    );
+    if (!row) throw new NotFoundException('ไม่พบสาขา');
+    return formatDepartment(row);
+  }
+
+  async deleteDepartment(id: string): Promise<void> {
+    const dept = await this.db.queryOne<{ name: string; faculty_id: string }>(
+      `SELECT d.name, f.name AS faculty_name FROM departments d JOIN faculties f ON f.id = d.faculty_id WHERE d.id = $1`,
+      [id],
+    );
+    if (!dept) throw new NotFoundException('ไม่พบสาขา');
+
+    const inUse = await this.db.queryOne<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM users WHERE department = $1`,
+      [dept.name],
+    );
+    if (inUse && parseInt(inUse.count, 10) > 0) {
+      throw new ConflictException('ไม่สามารถลบได้ เนื่องจากมีผู้ใช้ในสาขานี้อยู่');
+    }
+    await this.db.execute(`DELETE FROM departments WHERE id = $1`, [id]);
   }
 
   // ── Login Attempts ────────────────────────────────────────────────────────

@@ -28,6 +28,16 @@ export class ListUsersDto {
   @IsBoolean()
   isActive?: boolean;
 
+  /**
+   * Filter by patient type:
+   * - student: role=student AND student_id IS NOT NULL
+   * - staff_member: role=staff (non-admin staff registered as patients)
+   * - external: role=student AND student_id IS NULL (external persons)
+   */
+  @IsOptional()
+  @IsEnum(['student', 'staff_member', 'external'])
+  patientType?: 'student' | 'staff_member' | 'external';
+
   /** Search by name, email, or student_id */
   @IsOptional()
   @IsString()

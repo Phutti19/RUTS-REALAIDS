@@ -42,7 +42,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       password: this.config.get<string>('DATABASE_PASSWORD', 'realaids1234'),
       max: 20,                    // max pool size
       idleTimeoutMillis: 30_000,  // close idle clients after 30s
-      connectionTimeoutMillis: 5_000,
+      connectionTimeoutMillis: 10_000,
     });
 
     this.pool.on('error', (err: Error) => {
