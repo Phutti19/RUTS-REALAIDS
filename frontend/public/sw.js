@@ -42,8 +42,11 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
 
-  // Skip API requests — always go to network
+  // Skip API requests and WebSocket — always go to network
   if (url.pathname.startsWith("/api/")) return;
+
+  // Skip cross-origin requests (CDN, external scripts, etc.)
+  if (url.origin !== self.location.origin) return;
 
   // Navigation requests — network first, fallback to offline page
   if (request.mode === "navigate") {
@@ -66,13 +69,15 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
-      return fetch(request).then((response) => {
-        if (response.ok && response.type === "basic") {
-          const clone = response.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, clone));
-        }
-        return response;
-      });
+      return fetch(request)
+        .then((response) => {
+          if (response.ok && response.type === "basic") {
+            const clone = response.clone();
+            caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => new Response("", { status: 408, statusText: "Offline" }));
     })
   );
 });

@@ -145,7 +145,10 @@ export default function StaffDashboard() {
   const [loading, setLoading] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isAlerting, setIsAlerting] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [infirmaryLat, setInfirmaryLat] = useState<number | undefined>(undefined);
+  const [infirmaryLng, setInfirmaryLng] = useState<number | undefined>(undefined);
+  const [infirmaryName, setInfirmaryName] = useState("ห้องพยาบาล");
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const hasMounted = useRef(false);
   const soundEnabledRef = useRef(true);
   const alertIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -173,6 +176,15 @@ export default function StaffDashboard() {
     if (!user) return;
     loadData();
     hasMounted.current = true;
+
+    // Fetch infirmary location from system settings
+    api.get<{ name: string | null; lat: number | null; lng: number | null }>("/settings/infirmary").then((res) => {
+      if (res.success && res.data) {
+        if (res.data.name) setInfirmaryName(res.data.name);
+        if (res.data.lat != null) setInfirmaryLat(res.data.lat);
+        if (res.data.lng != null) setInfirmaryLng(res.data.lng);
+      }
+    });
   }, [user, loadData]);
 
   useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);
@@ -181,12 +193,35 @@ export default function StaffDashboard() {
   const playBeep = useCallback(() => {
     if (!soundEnabledRef.current) return;
     try {
-      if (!audioRef.current) {
-        audioRef.current = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq4JNKih2n8/VqXtMMCqBpuLluYZSMC2LtOvbuIlTMy+Uvu/dvIlTNS6Tw+zgv41VMzCNwuvhv45SMjGIv+fhwJBVMTGIwenhwJFWMzGIwujiwJFWMzKJwuniwpBXMzCIwOniwpFXNTCIv+niwZFXNDCIwOniwpFXMzCIwOniwZFWNTCIwOniwpFWNDCIwOniwpFWMzCIwOniwpFWMzCIwOniwpFWMzCIwOniwpFWMzCIwOniwpFWMzCIwOniwpFW");
-        audioRef.current.volume = 0.7;
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new AudioContext();
       }
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") ctx.resume();
+
+      const now = ctx.currentTime;
+      const gain = ctx.createGain();
+      gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.5, now);
+
+      // Two-tone emergency beep (high-low pattern)
+      const playTone = (freq: number, start: number, dur: number) => {
+        const osc = ctx.createOscillator();
+        osc.type = "square";
+        osc.frequency.setValueAtTime(freq, now + start);
+        osc.connect(gain);
+        osc.start(now + start);
+        osc.stop(now + start + dur);
+      };
+
+      // Beep pattern: high-low-high (sounds urgent)
+      playTone(880, 0, 0.15);
+      playTone(660, 0.2, 0.15);
+      playTone(880, 0.4, 0.15);
+
+      // Fade out
+      gain.gain.setValueAtTime(0.5, now + 0.55);
+      gain.gain.linearRampToValueAtTime(0, now + 0.6);
     } catch {}
   }, []);
 
@@ -203,16 +238,11 @@ export default function StaffDashboard() {
       clearInterval(alertIntervalRef.current);
       alertIntervalRef.current = null;
     }
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
   }, []);
 
   const handleSoundToggle = useCallback(() => {
     setSoundEnabled((s) => {
       soundEnabledRef.current = !s;
-      if (s && audioRef.current) audioRef.current.pause();
       return !s;
     });
   }, []);
@@ -385,6 +415,9 @@ export default function StaffDashboard() {
               onSelectIncident={(inc) => {
                 window.location.href = `/staff/emergency?id=${inc.id}`;
               }}
+              infirmaryLat={infirmaryLat}
+              infirmaryLng={infirmaryLng}
+              infirmaryName={infirmaryName}
             />
           </div>
 

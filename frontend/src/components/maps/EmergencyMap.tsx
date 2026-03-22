@@ -91,6 +91,11 @@ export function EmergencyMap({
         infirmaryMarkerRef.current = null;
       }
 
+      // Re-center map to new infirmary coords (when no incidents will fitBounds later)
+      if (incidents.length === 0) {
+        map.setView([infirmaryLat, infirmaryLng], map.getZoom());
+      }
+
       const infirmaryIcon = L.divIcon({
         html: `<div style="
           width:32px;height:32px;
@@ -108,10 +113,15 @@ export function EmergencyMap({
 
       infirmaryMarkerRef.current = L.marker([infirmaryLat, infirmaryLng], { icon: infirmaryIcon })
         .addTo(map)
-        .bindPopup(`<b>${infirmaryName}</b>`)
-        .openPopup();
+        .bindPopup(`<b>${infirmaryName}</b>`);
+      // Delay openPopup to avoid _leaflet_pos error during initial map render
+      setTimeout(() => {
+        if (infirmaryMarkerRef.current && leafletRef.current) {
+          infirmaryMarkerRef.current.openPopup();
+        }
+      }, 300);
     });
-  }, [infirmaryLat, infirmaryLng, infirmaryName, mapReady]);
+  }, [infirmaryLat, infirmaryLng, infirmaryName, mapReady, incidents.length]);
 
   // Update markers when incidents change — also re-runs when mapReady flips true,
   // which handles the race condition where incidents arrive before Leaflet finishes loading.
@@ -122,8 +132,12 @@ export function EmergencyMap({
       const map = leafletRef.current;
       if (!map) return;
 
-      // Remove old markers
-      markersRef.current.forEach((m) => m.remove());
+      // Close popups and remove old markers safely
+      map.closePopup();
+      markersRef.current.forEach((m) => {
+        m.closePopup();
+        m.remove();
+      });
       markersRef.current = [];
 
       const validIncidents = incidents.filter((i) => i.latitude && i.longitude);
@@ -181,7 +195,7 @@ export function EmergencyMap({
       });
 
       if (bounds.length > 1) {
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16, animate: false });
       }
     });
   }, [incidents, selectedId, infirmaryLat, infirmaryLng, onSelectIncident, mapReady]);
@@ -192,6 +206,15 @@ export function EmergencyMap({
         @keyframes pulse {
           0%,100% { transform:rotate(-45deg) scale(1); }
           50% { transform:rotate(-45deg) scale(1.15); }
+        }
+        .leaflet-popup-content {
+          font-family: "Prompt", "Kanit", Arial, Helvetica, sans-serif !important;
+        }
+        .leaflet-popup-content b {
+          font-weight: 600;
+        }
+        .leaflet-popup-content button {
+          font-family: "Prompt", "Kanit", Arial, Helvetica, sans-serif !important;
         }
       `}</style>
       <div ref={mapRef} className="w-full h-full rounded-xl overflow-hidden" />

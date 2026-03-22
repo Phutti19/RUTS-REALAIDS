@@ -15,7 +15,11 @@ export const metadata: Metadata = {
     title: "RUTS REALAIDS",
   },
   icons: {
-    apple: "/icons/apple-touch-icon.png",
+    icon: [
+      { url: "/icons/icon0.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/icons/icon0.svg",
+    apple: "/icons/apple-icon.png",
   },
 };
 
