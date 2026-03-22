@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Search, Loader2, User, AlertCircle, UserPlus, X, GraduationCap, Briefcase, UserRound } from "lucide-react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useFaculties } from "@/hooks/useFaculties";
 
@@ -123,7 +123,7 @@ export default function NewVisitPage() {
     if (res.success && res.data) {
       selectPatient(res.data as UserResult);
     } else {
-      setRegError(res.message ?? "เกิดข้อผิดพลาด");
+      setRegError(extractError(res));
     }
   };
 
@@ -152,7 +152,7 @@ export default function NewVisitPage() {
     if (res.success && res.data) {
       router.push(`/staff/patients/${res.data.id}`);
     } else {
-      setError(res.message ?? "เกิดข้อผิดพลาด");
+      setError(extractError(res));
     }
   };
 

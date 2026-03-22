@@ -18,7 +18,7 @@ import {
   Activity,
   Zap,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import {
   cn,
@@ -150,7 +150,7 @@ function EmergencyPageContent() {
       openDetail(selectedIncident.id);
       loadIncidents();
     } else {
-      setActionMsg({ type: "err", text: res.message ?? "เกิดข้อผิดพลาด" });
+      setActionMsg({ type: "err", text: extractError(res) });
     }
   };
 

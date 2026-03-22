@@ -33,7 +33,7 @@ export class UsersService {
       [userId],
     );
 
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundException('ไม่พบผู้ใช้');
     return this.formatProfile(user);
   }
 
@@ -72,7 +72,7 @@ export class UsersService {
       values,
     );
 
-    if (!updated) throw new NotFoundException('User not found');
+    if (!updated) throw new NotFoundException('ไม่พบผู้ใช้');
     this.logger.log(`Profile updated: userId=${userId}`);
 
     return this.formatProfile(updated);
@@ -85,7 +85,7 @@ export class UsersService {
       `SELECT id FROM users WHERE id = $1`,
       [userId],
     );
-    if (!userExists) throw new NotFoundException('User not found');
+    if (!userExists) throw new NotFoundException('ไม่พบผู้ใช้');
 
     const row = await this.db.queryOne<HealthProfileRow>(
       `SELECT id, user_id, blood_type, allergies, chronic_diseases,
@@ -108,7 +108,7 @@ export class UsersService {
       `SELECT id FROM users WHERE id = $1`,
       [userId],
     );
-    if (!userExists) throw new NotFoundException('User not found');
+    if (!userExists) throw new NotFoundException('ไม่พบผู้ใช้');
 
     // Upsert: create profile on first call, update on subsequent calls
     const row = await this.db.queryOne<HealthProfileRow>(

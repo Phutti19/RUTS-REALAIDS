@@ -16,7 +16,7 @@ import {
   FileText,
   AlertCircle,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { cn, formatDate, formatDateTime, statusLabel } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type { Appointment, AppointmentSlot } from "@/types";
@@ -286,7 +286,7 @@ export default function StudentAppointmentsPage() {
         setNotes("");
       }, 2000);
     } else {
-      setBookError(res.message ?? "เกิดข้อผิดพลาด");
+      setBookError(extractError(res));
     }
   };
 

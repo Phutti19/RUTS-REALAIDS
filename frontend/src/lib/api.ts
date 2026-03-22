@@ -99,6 +99,14 @@ async function request<T>(
   return data as ApiResponse<T>;
 }
 
+/** Extract specific validation errors or fall back to generic message */
+export function extractError(res: ApiResponse, fallback = "เกิดข้อผิดพลาด"): string {
+  if (Array.isArray(res.errors) && res.errors.length > 0) {
+    return (res.errors as string[]).join(", ");
+  }
+  return res.message ?? fallback;
+}
+
 export const api = {
   get<T>(path: string) {
     return request<T>(path, { method: "GET" });

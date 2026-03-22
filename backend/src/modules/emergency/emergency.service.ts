@@ -65,7 +65,7 @@ export class EmergencyService {
       ],
     );
 
-    if (!incident) throw new BadRequestException('Failed to create incident');
+    if (!incident) throw new BadRequestException('ไม่สามารถสร้างเหตุฉุกเฉินได้ กรุณาตรวจสอบข้อมูลแล้วลองใหม่');
 
     const detail = await this.getIncidentById(incident.id, reporterId, 'student');
 
@@ -218,7 +218,7 @@ export class EmergencyService {
 
     // Students can only view their own incidents
     if (callerRole === 'student' && row.reporter_id !== callerId) {
-      throw new ForbiddenException('Access denied');
+      throw new ForbiddenException('คุณสามารถดูได้เฉพาะเหตุฉุกเฉินที่คุณแจ้งเท่านั้น');
     }
 
     const images = await this.getImages(id);
@@ -349,7 +349,7 @@ export class EmergencyService {
       [incidentId, dto.imageUrl, dto.caption ?? null, dto.sortOrder ?? 0],
     );
 
-    if (!row) throw new BadRequestException('Failed to add image');
+    if (!row) throw new BadRequestException('ไม่สามารถเพิ่มรูปภาพได้ กรุณาลองใหม่');
     this.logger.log(`Image added: incident=${incidentId}`);
 
     return this.formatImage(row);
@@ -382,7 +382,7 @@ export class EmergencyService {
     );
     if (!incident) throw new NotFoundException(`Incident '${incidentId}' not found`);
     if (callerRole === 'student' && incident.reporter_id !== callerId) {
-      throw new ForbiddenException('Access denied');
+      throw new ForbiddenException('คุณสามารถดูสถานะเหตุฉุกเฉินที่คุณแจ้งเท่านั้น');
     }
 
     const rows = await this.db.queryMany<IncidentStatusLogRow>(

@@ -4,7 +4,7 @@ import { Transform, Type } from 'class-transformer';
 export class AdjustStockDto {
   /** Positive = add, negative = remove. Cannot be 0. */
   @Type(() => Number)
-  @IsInt()
+  @IsInt({ message: 'จำนวนต้องเป็นจำนวนเต็ม' })
   @Min(-1_000_000)
   @Max(1_000_000)
   quantityChange: number;

@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronUp, Trash2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import type { Medicine, MedicineBatch, MedicineStockLog } from "@/types";
 
@@ -68,7 +68,7 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
     const res = await api.delete(`/medicines/${id}`);
     setDeleting(false);
     if (res.success) router.push("/staff/medicines");
-    else setDeleteError(res.message ?? "ไม่สามารถลบได้");
+    else setDeleteError(extractError(res, "ไม่สามารถลบได้"));
   };
 
   const addBatch = async () => {
@@ -82,7 +82,7 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
       setBatchNumber(""); setBatchQty(1); setExpiryDate(""); setBatchNote("");
       setShowBatchForm(false); loadData();
     } else {
-      setBatchMsg({ type: "err", text: res.message ?? "เกิดข้อผิดพลาด" });
+      setBatchMsg({ type: "err", text: extractError(res) });
     }
   };
 
@@ -99,7 +99,7 @@ export default function MedicineDetailPage({ params }: { params: Promise<{ id: s
       setAdjustQty(0); setAdjustBatchId(""); setAdjustNote("");
       setShowAdjustForm(false); loadData();
     } else {
-      setAdjustMsg({ type: "err", text: res.message ?? "เกิดข้อผิดพลาด" });
+      setAdjustMsg({ type: "err", text: extractError(res) });
     }
   };
 

@@ -351,7 +351,7 @@ export class ReportsService {
 
   private async buildMonthlyPdf(dateStr: string): Promise<PdfExportResult> {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) throw new BadRequestException('Invalid date.');
+    if (isNaN(d.getTime())) throw new BadRequestException('รูปแบบวันที่ไม่ถูกต้อง กรุณาใช้รูปแบบ YYYY-MM-DD');
 
     const year  = d.getFullYear();
     const month = d.getMonth() + 1; // 1–12

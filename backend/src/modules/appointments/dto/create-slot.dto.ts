@@ -23,26 +23,26 @@ export class CreateSlotDto {
    * (matches PostgreSQL EXTRACT(DOW FROM date))
    */
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(6)
+  @IsInt({ message: 'วันในสัปดาห์ต้องเป็นจำนวนเต็ม (0=อาทิตย์ ถึง 6=เสาร์)' })
+  @Min(0, { message: 'วันในสัปดาห์ต้องเป็น 0-6 (0=อาทิตย์ ถึง 6=เสาร์)' })
+  @Max(6, { message: 'วันในสัปดาห์ต้องเป็น 0-6 (0=อาทิตย์ ถึง 6=เสาร์)' })
   dayOfWeek: number;
 
   /** Slot start time in HH:MM format */
   @IsString()
-  @Matches(TIME_REGEX, { message: 'startTime must be HH:MM or HH:MM:SS' })
+  @Matches(TIME_REGEX, { message: 'เวลาเริ่มต้องเป็นรูปแบบ HH:MM เช่น 08:00' })
   startTime: string;
 
   /** Slot end time in HH:MM format */
   @IsString()
-  @Matches(TIME_REGEX, { message: 'endTime must be HH:MM or HH:MM:SS' })
+  @Matches(TIME_REGEX, { message: 'เวลาสิ้นสุดต้องเป็นรูปแบบ HH:MM เช่น 12:00' })
   endTime: string;
 
   /** Duration in minutes for each sub-slot within the window */
   @Type(() => Number)
-  @IsInt()
-  @Min(5)
-  @Max(480)
+  @IsInt({ message: 'ระยะเวลาต้องเป็นจำนวนเต็ม (นาที)' })
+  @Min(5, { message: 'ระยะเวลาต้องอย่างน้อย 5 นาที' })
+  @Max(480, { message: 'ระยะเวลาต้องไม่เกิน 480 นาที' })
   slotDurationMinutes: number;
 
   /** Maximum number of patients that can book this slot on a given day */

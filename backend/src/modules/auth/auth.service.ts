@@ -44,7 +44,7 @@ export class AuthService {
     if (failedCount >= MAX_FAILED_ATTEMPTS) {
       await this.recordAttempt(email, ipAddress, userAgent, false, 'ACCOUNT_LOCKED');
       throw new UnauthorizedException(
-        `Too many failed attempts. Account locked for ${LOCK_WINDOW_MINUTES} minutes.`,
+        `เข้าสู่ระบบผิดหลายครั้ง บัญชีถูกล็อค ${LOCK_WINDOW_MINUTES} นาที`,
       );
     }
 
@@ -57,12 +57,12 @@ export class AuthService {
 
     if (!user) {
       await this.recordAttempt(email, ipAddress, userAgent, false, 'USER_NOT_FOUND');
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
     }
 
     if (!user.is_active) {
       await this.recordAttempt(email, ipAddress, userAgent, false, 'ACCOUNT_INACTIVE');
-      throw new UnauthorizedException('Account is inactive. Please contact an administrator.');
+      throw new UnauthorizedException('บัญชีถูกระงับ กรุณาติดต่อผู้ดูแลระบบ');
     }
 
     // 3. Verify password (bcryptjs compare)
@@ -72,9 +72,9 @@ export class AuthService {
       const remaining = MAX_FAILED_ATTEMPTS - (failedCount + 1);
       const hint =
         remaining > 0
-          ? ` ${remaining} attempt(s) remaining before lockout.`
-          : ` Account will be locked on next failure.`;
-      throw new UnauthorizedException(`Invalid email or password.${hint}`);
+          ? ` เหลือโอกาสลองอีก ${remaining} ครั้งก่อนถูกล็อค`
+          : ` บัญชีจะถูกล็อคหากผิดอีกครั้ง`;
+      throw new UnauthorizedException(`อีเมลหรือรหัสผ่านไม่ถูกต้อง${hint}`);
     }
 
     // 4. Record success and issue tokens
@@ -91,7 +91,7 @@ export class AuthService {
       [dto.email],
     );
     if (existingEmail) {
-      throw new ConflictException('This email address is already registered');
+      throw new ConflictException('อีเมลนี้ถูกใช้งานแล้ว');
     }
 
     // Check student_id uniqueness if provided
@@ -101,7 +101,7 @@ export class AuthService {
         [dto.studentId],
       );
       if (existingStudentId) {
-        throw new ConflictException('This student ID is already registered');
+        throw new ConflictException('รหัสนักศึกษานี้ถูกใช้งานแล้ว');
       }
     }
 
@@ -200,11 +200,11 @@ export class AuthService {
     );
 
     if (!tokenRow) {
-      throw new UnauthorizedException('Invalid or expired refresh token');
+      throw new UnauthorizedException('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
     }
 
     if (!tokenRow.is_active) {
-      throw new UnauthorizedException('Account is inactive');
+      throw new UnauthorizedException('บัญชีถูกระงับ กรุณาติดต่อผู้ดูแลระบบ');
     }
 
     const accessToken = this.signAccessToken(tokenRow.user_id, tokenRow.role);
@@ -284,13 +284,13 @@ export class AuthService {
     );
 
     if (!tokenRow) {
-      throw new BadRequestException('Invalid reset token');
+      throw new BadRequestException('ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้อง');
     }
     if (tokenRow.used_at !== null) {
-      throw new BadRequestException('This reset token has already been used');
+      throw new BadRequestException('ลิงก์รีเซ็ตรหัสผ่านนี้ถูกใช้งานแล้ว');
     }
     if (new Date(tokenRow.expires_at) < new Date()) {
-      throw new BadRequestException('Reset token has expired. Please request a new one.');
+      throw new BadRequestException('ลิงก์รีเซ็ตรหัสผ่านหมดอายุแล้ว กรุณาขอลิงก์ใหม่');
     }
 
     const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);

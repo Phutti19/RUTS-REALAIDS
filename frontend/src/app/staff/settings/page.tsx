@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { usePushNotification } from "@/hooks/usePushNotification";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { SystemSetting, EmergencyContact } from "@/types";
 
@@ -104,7 +104,7 @@ function ProfileTab({ user }: { user: ReturnType<typeof useAuthContext>["user"] 
       await refreshUser();
       setMsg({ type: "success", text: "บันทึกสำเร็จ" });
     } else {
-      setMsg({ type: "error", text: res.message ?? "เกิดข้อผิดพลาด" });
+      setMsg({ type: "error", text: extractError(res) });
     }
   };
 
@@ -344,7 +344,7 @@ function ContactsTab() {
       setName(""); setPhone(""); setNote("");
       setShowForm(false);
     } else {
-      setError(res.message ?? "เกิดข้อผิดพลาด");
+      setError(extractError(res));
     }
   };
 
@@ -595,7 +595,7 @@ function UsersTab() {
       resetForm(); setShowForm(false);
       setCurrentPage(1); fetchCounts();
     } else {
-      setError(res.message ?? "เกิดข้อผิดพลาด");
+      setError(extractError(res));
     }
   };
 
@@ -662,6 +662,7 @@ function UsersTab() {
             <input value={fPassword} onChange={(e) => setFPassword(e.target.value)} placeholder="รหัสผ่าน *" type="password"
               className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400" />
           </div>
+          <p className="text-[10px] text-gray-400 -mt-1.5">รหัสผ่านอย่างน้อย 8 ตัวอักษร ประกอบด้วยตัวพิมพ์ใหญ่ ตัวพิมพ์เล็ก และตัวเลข</p>
           <div className="flex gap-2">
             {(["staff", "admin"] as const).map((r) => (
               <button key={r} onClick={() => setFRole(r)}
@@ -926,7 +927,7 @@ function TreatmentTypesTab() {
       setName("");
       fetchTypes();
     } else {
-      setError(res.message ?? "เกิดข้อผิดพลาด");
+      setError(extractError(res));
     }
   };
 
@@ -946,7 +947,7 @@ function TreatmentTypesTab() {
     if (res.success) {
       fetchTypes();
     } else {
-      setError(res.message ?? "ไม่สามารถลบได้");
+      setError(extractError(res, "ไม่สามารถลบได้"));
     }
   };
 
@@ -1095,7 +1096,7 @@ function FacultiesTab() {
       setNewFacultyName("");
       fetchFaculties();
     } else {
-      setError(res.message ?? "เกิดข้อผิดพลาด");
+      setError(extractError(res));
     }
   };
 
@@ -1107,7 +1108,7 @@ function FacultiesTab() {
       setEditingFaculty(null);
       fetchFaculties();
     } else {
-      setError(res.message ?? "เกิดข้อผิดพลาด");
+      setError(extractError(res));
     }
   };
 
@@ -1127,7 +1128,7 @@ function FacultiesTab() {
     if (res.success) {
       fetchFaculties();
     } else {
-      setError(res.message ?? "ไม่สามารถลบได้");
+      setError(extractError(res, "ไม่สามารถลบได้"));
     }
   };
 
@@ -1144,7 +1145,7 @@ function FacultiesTab() {
       setNewDeptName("");
       fetchFaculties();
     } else {
-      setError(res.message ?? "เกิดข้อผิดพลาด");
+      setError(extractError(res));
     }
   };
 
@@ -1156,7 +1157,7 @@ function FacultiesTab() {
       setEditingDept(null);
       fetchFaculties();
     } else {
-      setError(res.message ?? "เกิดข้อผิดพลาด");
+      setError(extractError(res));
     }
   };
 
@@ -1176,7 +1177,7 @@ function FacultiesTab() {
     if (res.success) {
       fetchFaculties();
     } else {
-      setError(res.message ?? "ไม่สามารถลบได้");
+      setError(extractError(res, "ไม่สามารถลบได้"));
     }
   };
 
@@ -1740,7 +1741,7 @@ function BroadcastTab() {
       setTitle("");
       setMessage("");
     } else {
-      setMsg({ type: "error", text: res.message ?? "เกิดข้อผิดพลาด" });
+      setMsg({ type: "error", text: extractError(res) });
     }
   };
 
@@ -1983,7 +1984,7 @@ function BackupTab() {
         if (r.success && r.data) setBackups(r.data);
       });
     } else {
-      setMsg({ type: "error", text: res.message ?? "เกิดข้อผิดพลาด" });
+      setMsg({ type: "error", text: extractError(res) });
     }
   };
 

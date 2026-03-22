@@ -11,8 +11,8 @@ import { Transform, Type } from 'class-transformer';
 
 export class CreateMedicineDto {
   @IsString()
-  @IsNotEmpty()
-  @MaxLength(200)
+  @IsNotEmpty({ message: 'กรุณาระบุชื่อยา/เวชภัณฑ์' })
+  @MaxLength(200, { message: 'ชื่อยาต้องไม่เกิน 200 ตัวอักษร' })
   @Transform(({ value }: { value: string }) => value?.trim())
   name: string;
 
@@ -22,7 +22,9 @@ export class CreateMedicineDto {
   @Transform(({ value }: { value: string }) => value?.trim())
   genericName?: string | null;
 
-  @IsEnum(['medicine', 'supply', 'equipment'])
+  @IsEnum(['medicine', 'supply', 'equipment'], {
+    message: 'ประเภทต้องเป็น medicine, supply หรือ equipment',
+  })
   category: string;
 
   @IsOptional()

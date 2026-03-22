@@ -70,7 +70,7 @@ export class VisitsService {
       ],
     );
 
-    if (!row) throw new BadRequestException('Failed to create visit');
+    if (!row) throw new BadRequestException('ไม่สามารถสร้างการเข้ารับบริการได้ กรุณาตรวจสอบข้อมูลผู้ป่วย');
 
     const visit = await this.getVisitById(row.id, staffId, 'staff');
 
@@ -220,7 +220,7 @@ export class VisitsService {
     if (!row) throw new NotFoundException(`Visit '${id}' not found`);
 
     if (callerRole === 'student' && row.patient_id !== callerId) {
-      throw new ForbiddenException('Access denied');
+      throw new ForbiddenException('คุณสามารถดูได้เฉพาะการเข้ารับบริการของคุณเท่านั้น');
     }
 
     return this.formatVisit(row);
@@ -353,7 +353,7 @@ export class VisitsService {
     if (!visit) throw new NotFoundException(`Visit '${visitId}' not found`);
     if (visit.status === 'completed' || visit.status === 'referred') {
       throw new BadRequestException(
-        `Cannot dispense medication for a visit with status '${visit.status}'`,
+        `ไม่สามารถจ่ายยาได้เนื่องจากสถานะการรักษาเป็น "${visit.status}" (ต้องเป็น waiting หรือ in_treatment)`,
       );
     }
 
@@ -370,7 +370,7 @@ export class VisitsService {
     if (!medicine) throw new NotFoundException(`Medicine '${dto.medicineId}' not found`);
     if (medicine.stock_quantity < dto.quantity) {
       throw new BadRequestException(
-        `Insufficient stock. Available: ${medicine.stock_quantity}, Requested: ${dto.quantity}`,
+        `สต็อกไม่เพียงพอ (คงเหลือ: ${medicine.stock_quantity}, ต้องการ: ${dto.quantity})`,
       );
     }
 
@@ -491,7 +491,7 @@ export class VisitsService {
     );
     if (!visit) throw new NotFoundException(`Visit '${visitId}' not found`);
     if (callerRole === 'student' && visit.patient_id !== callerId) {
-      throw new ForbiddenException('Access denied');
+      throw new ForbiddenException('คุณสามารถดูรายการยาของการรักษาของคุณเท่านั้น');
     }
 
     const rows = await this.db.queryMany<VisitMedicationRow>(

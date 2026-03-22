@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, Plus, Trash2, ToggleLeft, ToggleRight, Loader2, AlertCircle, Clock } from "lucide-react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { AppointmentSlot } from "@/types";
 
@@ -87,7 +87,7 @@ export default function SlotsPage() {
       setShowForm(false);
       setStartTime("08:00"); setEndTime("12:00"); setSlotDuration(30);
     } else {
-      setError(res.message ?? "เกิดข้อผิดพลาด");
+      setError(extractError(res));
     }
   };
 

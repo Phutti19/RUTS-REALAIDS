@@ -4,7 +4,7 @@ import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2, CheckCircle2, Siren, AlertCircle } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -69,7 +69,7 @@ function ResetPasswordForm() {
     if (res.success) {
       setSuccess(true);
     } else {
-      setError(res.message ?? "เกิดข้อผิดพลาด ลิงก์อาจหมดอายุแล้ว กรุณาขอลิงก์ใหม่");
+      setError(extractError(res, "เกิดข้อผิดพลาด ลิงก์อาจหมดอายุแล้ว กรุณาขอลิงก์ใหม่"));
     }
   };
 

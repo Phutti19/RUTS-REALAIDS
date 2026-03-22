@@ -13,7 +13,7 @@ import {
   Siren,
   MapPin,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const LocationPicker = dynamic(
@@ -95,17 +95,65 @@ export default function EmergencyReportPage() {
       return;
     }
     setGps((s) => ({ ...s, loading: true, error: "" }));
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy), loading: false, error: "" });
-        setPickedLat(pos.coords.latitude);
-        setPickedLng(pos.coords.longitude);
-      },
-      (err) => {
-        setGps((s) => ({ ...s, loading: false, error: err.code === 1 ? "ไม่ได้รับอนุญาต GPS" : "ไม่สามารถดึง GPS ได้" }));
-      },
-      { enableHighAccuracy: true, timeout: 10_000 }
-    );
+
+    const requestGps = async () => {
+      // Use Permissions API to check state before requesting (if available)
+      let permState: string | null = null;
+      try {
+        if ("permissions" in navigator) {
+          const status = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+          permState = status.state; // "granted" | "denied" | "prompt"
+        }
+      } catch {
+        // Permissions API not supported — fallback to direct request
+      }
+
+      // If already denied at browser/OS level, show specific message
+      if (permState === "denied") {
+        setGps((s) => ({
+          ...s,
+          loading: false,
+          error: "GPS ถูกบล็อก — กรุณาเปิดสิทธิ์ตำแหน่งในตั้งค่าเบราว์เซอร์หรือตั้งค่ามือถือ",
+        }));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setGps({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: Math.round(pos.coords.accuracy),
+            loading: false,
+            error: "",
+          });
+          setPickedLat(pos.coords.latitude);
+          setPickedLng(pos.coords.longitude);
+        },
+        (err) => {
+          let errorMsg: string;
+          if (err.code === 1) {
+            // PERMISSION_DENIED — could be bubble mode, overlay, or user denied
+            if (permState === "prompt") {
+              // Permission was "prompt" but still denied = bubble/overlay blocking the dialog
+              errorMsg =
+                "ไม่สามารถขอสิทธิ์ GPS ได้ — ลองเปิดในเบราว์เซอร์แบบเต็มจอ (ไม่ใช่โหมดบับเบิลหรือหน้าต่างลอย)";
+            } else {
+              errorMsg =
+                "GPS ถูกบล็อก — กรุณาเปิดสิทธิ์ตำแหน่งในตั้งค่าเบราว์เซอร์หรือตั้งค่ามือถือ";
+            }
+          } else if (err.code === 2) {
+            errorMsg = "ไม่สามารถดึงตำแหน่ง GPS ได้ — กรุณาเปิด Location/ตำแหน่ง ในตั้งค่ามือถือ";
+          } else {
+            errorMsg = "หมดเวลาดึง GPS — ลองใหม่อีกครั้ง";
+          }
+          setGps((s) => ({ ...s, loading: false, error: errorMsg }));
+        },
+        { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 }
+      );
+    };
+
+    requestGps();
   }, [gpsRetry]);
 
   const handlePickedLocation = useCallback((lat: number, lng: number) => {
@@ -133,7 +181,7 @@ export default function EmergencyReportPage() {
     if (res.success && res.data) {
       router.push(`/student/emergency/track/${res.data.id}`);
     } else {
-      setSubmitError(res.message ?? "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      setSubmitError(extractError(res, "เกิดข้อผิดพลาด กรุณาลองใหม่"));
     }
   };
 
@@ -212,8 +260,8 @@ export default function EmergencyReportPage() {
               <p className="text-sm text-blue-800 font-medium">กำลังดึงตำแหน่ง GPS...</p>
             ) : gps.error ? (
               <>
-                <p className="text-sm text-amber-800 font-medium">{gps.error}</p>
-                <p className="text-sm text-amber-700">ปักหมุดตำแหน่งบนแผนที่ด้วยตนเอง</p>
+                <p className="text-xs text-amber-800 font-medium">{gps.error}</p>
+                <p className="text-xs text-amber-700 mt-0.5">ปักหมุดตำแหน่งบนแผนที่ด้วยตนเอง</p>
               </>
             ) : (
               <>

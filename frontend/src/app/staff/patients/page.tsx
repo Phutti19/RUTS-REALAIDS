@@ -9,7 +9,7 @@ import {
   AlertCircle, Clock, CheckCircle2, Stethoscope,
   ArrowRight, ClipboardList, Activity, Briefcase, UserRound,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { cn, timeAgo, statusLabel } from "@/lib/utils";
 import { useFaculties } from "@/hooks/useFaculties";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -224,7 +224,7 @@ export default function PatientsPage() {
     if (res.success && res.data) {
       selectPatient(res.data as UserResult);
     } else {
-      setRegError(res.message ?? "เกิดข้อผิดพลาด");
+      setRegError(extractError(res));
     }
   };
 
@@ -262,7 +262,7 @@ export default function PatientsPage() {
     if (res.success && res.data) {
       router.push(`/staff/patients/${res.data.id}`);
     } else {
-      setCreateError(res.message ?? "เกิดข้อผิดพลาด");
+      setCreateError(extractError(res));
     }
   };
 

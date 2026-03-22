@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, CheckCircle2, Siren } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -22,10 +22,7 @@ export default function ForgotPasswordPage() {
       setSent(true);
       if (res.data?.token) setDevToken(res.data.token);
     } else {
-      const firstDetail = Array.isArray(res.errors) && res.errors.length > 0
-        ? res.errors[0]
-        : null;
-      setError(firstDetail ?? res.message ?? "เกิดข้อผิดพลาด");
+      setError(extractError(res));
     }
   };
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import {
   setAccessToken,
   clearAccessToken,
@@ -69,7 +69,7 @@ export function useAuth() {
       });
       return { success: true, role: res.data.user.role as UserRole };
     }
-    return { success: false, error: res.message ?? "เข้าสู่ระบบไม่สำเร็จ" };
+    return { success: false, error: extractError(res, "เข้าสู่ระบบไม่สำเร็จ") };
   }, []);
 
   const logout = useCallback(async () => {

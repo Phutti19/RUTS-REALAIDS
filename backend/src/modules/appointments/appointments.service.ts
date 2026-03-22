@@ -124,7 +124,7 @@ export class AppointmentsService {
     // Validate date format
     const parsedDate = new Date(date);
     if (isNaN(parsedDate.getTime())) {
-      throw new BadRequestException('Invalid date format. Use YYYY-MM-DD.');
+      throw new BadRequestException('รูปแบบวันที่ไม่ถูกต้อง กรุณาใช้รูปแบบ YYYY-MM-DD');
     }
 
     const rows = await this.db.queryMany<AvailableSlotRow>(
@@ -242,7 +242,7 @@ export class AppointmentsService {
     // Validate date matches slot's day_of_week
     const bookDate = new Date(dto.date);
     if (isNaN(bookDate.getTime())) {
-      throw new BadRequestException('Invalid date format. Use YYYY-MM-DD.');
+      throw new BadRequestException('รูปแบบวันที่ไม่ถูกต้อง กรุณาใช้รูปแบบ YYYY-MM-DD');
     }
     // getDay() returns 0=Sunday … 6=Saturday, matching PostgreSQL DOW
     if (bookDate.getDay() !== slot.day_of_week) {
@@ -255,7 +255,7 @@ export class AppointmentsService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (bookDate < today) {
-      throw new BadRequestException('Cannot book appointments in the past.');
+      throw new BadRequestException('ไม่สามารถจองนัดหมายในวันที่ผ่านมาแล้วได้');
     }
 
     // Check duplicate: same patient, same slot, same date
@@ -266,7 +266,7 @@ export class AppointmentsService {
       [patientId, dto.slotId, dto.date],
     );
     if (duplicate) {
-      throw new ConflictException('You already have an appointment for this slot on that date.');
+      throw new ConflictException('คุณมีนัดหมายในช่วงเวลานี้แล้ว');
     }
 
     // Check capacity
@@ -277,7 +277,7 @@ export class AppointmentsService {
     );
     const bookedCount = parseInt(capacityRow?.booked_count ?? '0', 10);
     if (bookedCount >= slot.max_patients_per_slot) {
-      throw new ConflictException('This appointment slot is fully booked for the selected date.');
+      throw new ConflictException('ช่วงเวลานี้เต็มแล้วสำหรับวันที่เลือก');
     }
 
     // Create appointment + notification in one transaction
@@ -450,7 +450,7 @@ export class AppointmentsService {
     if (!row) throw new NotFoundException(`Appointment '${id}' not found.`);
 
     if (callerRole === 'student' && row.patient_id !== callerId) {
-      throw new ForbiddenException('Access denied.');
+      throw new ForbiddenException('คุณสามารถดูนัดหมายของคุณเท่านั้น');
     }
 
     return this.formatAppointment(row);
@@ -542,7 +542,7 @@ export class AppointmentsService {
     // Validate date matches slot's day_of_week
     const bookDate = new Date(dto.date);
     if (isNaN(bookDate.getTime())) {
-      throw new BadRequestException('Invalid date format. Use YYYY-MM-DD.');
+      throw new BadRequestException('รูปแบบวันที่ไม่ถูกต้อง กรุณาใช้รูปแบบ YYYY-MM-DD');
     }
     if (bookDate.getDay() !== slot.day_of_week) {
       throw new BadRequestException(
@@ -554,7 +554,7 @@ export class AppointmentsService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (bookDate < today) {
-      throw new BadRequestException('Cannot reschedule to a past date.');
+      throw new BadRequestException('ไม่สามารถเลื่อนนัดหมายไปวันที่ผ่านมาแล้วได้');
     }
 
     // Check capacity (exclude current appointment from count)
@@ -565,7 +565,7 @@ export class AppointmentsService {
     );
     const bookedCount = parseInt(capacityRow?.booked_count ?? '0', 10);
     if (bookedCount >= slot.max_patients_per_slot) {
-      throw new ConflictException('This appointment slot is fully booked for the selected date.');
+      throw new ConflictException('ช่วงเวลานี้เต็มแล้วสำหรับวันที่เลือก');
     }
 
     // Update appointment

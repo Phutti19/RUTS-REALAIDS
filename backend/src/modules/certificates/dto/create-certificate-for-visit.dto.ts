@@ -12,8 +12,8 @@ import { Type, Transform } from 'class-transformer';
 
 export class CreateCertificateForVisitDto {
   @IsString()
-  @IsNotEmpty()
-  @MaxLength(1000)
+  @IsNotEmpty({ message: 'กรุณาระบุการวินิจฉัย' })
+  @MaxLength(1000, { message: 'การวินิจฉัยต้องไม่เกิน 1,000 ตัวอักษร' })
   @Transform(({ value }: { value: string }) => value?.trim())
   diagnosisText: string;
 
@@ -25,16 +25,16 @@ export class CreateCertificateForVisitDto {
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(365)
+  @IsInt({ message: 'จำนวนวันพักต้องเป็นจำนวนเต็ม' })
+  @Min(0, { message: 'จำนวนวันพักต้องไม่น้อยกว่า 0' })
+  @Max(365, { message: 'จำนวนวันพักต้องไม่เกิน 365 วัน' })
   restDays?: number | null;
 
   @IsOptional()
-  @IsDateString()
+  @IsDateString({}, { message: 'วันเริ่มพักต้องเป็นรูปแบบ YYYY-MM-DD' })
   restStartDate?: string | null;
 
   @IsOptional()
-  @IsDateString()
+  @IsDateString({}, { message: 'วันสิ้นสุดพักต้องเป็นรูปแบบ YYYY-MM-DD' })
   restEndDate?: string | null;
 }

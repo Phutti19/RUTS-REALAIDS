@@ -7,7 +7,7 @@ import {
   CalendarCheck, CalendarX, Users, CalendarClock, X,
 } from "lucide-react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type { Appointment, AppointmentSlot, AppointmentStatus } from "@/types";
@@ -205,7 +205,7 @@ export default function StaffAppointmentsPage() {
     if (res.success) {
       setRescheduleTarget(null);
     } else {
-      setRescheduleError(res.message ?? "เกิดข้อผิดพลาด");
+      setRescheduleError(extractError(res));
     }
     // Always refresh appointments (whether success or error, status may have changed)
     setLoading(true);

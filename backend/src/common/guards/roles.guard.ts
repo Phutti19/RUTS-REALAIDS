@@ -35,12 +35,12 @@ export class RolesGuard implements CanActivate {
     const user = request.user;
 
     if (!user) {
-      throw new ForbiddenException('Access denied');
+      throw new ForbiddenException('ไม่มีสิทธิ์เข้าถึง กรุณาเข้าสู่ระบบ');
     }
 
     if (!requiredRoles.includes(user.role)) {
       throw new ForbiddenException(
-        `Role '${user.role}' does not have permission for this resource`,
+        `บทบาท "${user.role}" ไม่มีสิทธิ์ใช้งานฟีเจอร์นี้`,
       );
     }
 

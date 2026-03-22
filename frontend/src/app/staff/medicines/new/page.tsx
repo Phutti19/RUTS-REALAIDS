@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Package, Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const CATEGORIES = [
@@ -39,7 +39,7 @@ export default function NewMedicinePage() {
     if (res.success && res.data) {
       router.push(`/staff/medicines/${res.data.id}`);
     } else {
-      setError(res.message ?? "เกิดข้อผิดพลาด");
+      setError(extractError(res));
     }
   };
 

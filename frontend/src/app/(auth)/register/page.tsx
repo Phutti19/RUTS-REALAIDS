@@ -7,7 +7,7 @@ import {
   ArrowLeft, Eye, EyeOff, Loader2, Siren,
   CheckCircle2, Search, User, KeyRound,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 
 type Step = "lookup" | "setPassword" | "done";
 
@@ -40,7 +40,7 @@ export default function ChangePasswordPage() {
       setLookupData(res.data);
       setStep("setPassword");
     } else {
-      setError(res.message ?? "ไม่พบรหัสนักศึกษาในระบบ");
+      setError(extractError(res, "ไม่พบรหัสนักศึกษาในระบบ"));
     }
   };
 
@@ -57,10 +57,7 @@ export default function ChangePasswordPage() {
     if (res.success) {
       setStep("done");
     } else {
-      const msg = Array.isArray(res.errors) && res.errors.length > 0
-        ? res.errors[0]
-        : res.message ?? "เกิดข้อผิดพลาด";
-      setError(msg as string);
+      setError(extractError(res));
     }
   };
 

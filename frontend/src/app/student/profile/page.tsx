@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { usePushNotification } from "@/hooks/usePushNotification";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { HealthProfile } from "@/types";
 
@@ -100,7 +100,7 @@ export default function StudentProfilePage() {
       setPersonalMsg({ type: "success", text: "บันทึกสำเร็จ" });
       setTimeout(() => { setEditPersonal(false); setPersonalMsg(null); }, 1500);
     } else {
-      setPersonalMsg({ type: "error", text: res.message ?? "เกิดข้อผิดพลาด" });
+      setPersonalMsg({ type: "error", text: extractError(res) });
     }
   };
 
@@ -131,7 +131,7 @@ export default function StudentProfilePage() {
       setHealthMsg({ type: "success", text: "บันทึกสำเร็จ" });
       setTimeout(() => { setEditHealth(false); setHealthMsg(null); }, 1500);
     } else {
-      setHealthMsg({ type: "error", text: res.message ?? "เกิดข้อผิดพลาด" });
+      setHealthMsg({ type: "error", text: extractError(res) });
     }
   };
 
@@ -304,9 +304,23 @@ export default function StudentProfilePage() {
               </div>
             </div>
           ) : pushPermission === "denied" ? (
-            <div className="flex items-center gap-2 text-sm text-red-500">
-              <AlertCircle size={14} />
-              Push Notification ถูกบล็อก — กรุณาเปิดในตั้งค่าเบราว์เซอร์
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-red-500">
+                <AlertCircle size={14} className="flex-shrink-0" />
+                <span>Push Notification ถูกบล็อก</span>
+              </div>
+              <div className="bg-red-50 dark:bg-red-950/30 rounded-xl p-3 space-y-1.5">
+                <p className="text-xs font-semibold text-red-700 dark:text-red-400">วิธีเปิดการแจ้งเตือน:</p>
+                <ol className="text-xs text-red-600 dark:text-red-400 space-y-1 list-decimal list-inside">
+                  <li>แตะไอคอน <strong>กุญแจ/ล็อค</strong> (🔒) ที่แถบ URL ด้านบน</li>
+                  <li>แตะ <strong>&quot;สิทธิ์&quot;</strong> หรือ <strong>&quot;Permissions&quot;</strong></li>
+                  <li>เปิด <strong>&quot;การแจ้งเตือน&quot;</strong> หรือ <strong>&quot;Notifications&quot;</strong></li>
+                  <li>โหลดหน้าใหม่</li>
+                </ol>
+                <p className="text-[11px] text-red-500 dark:text-red-500 mt-1">
+                  * หรือไปที่ ตั้งค่ามือถือ → แอป → Chrome → การแจ้งเตือน → เปิด
+                </p>
+              </div>
             </div>
           ) : (
             <div

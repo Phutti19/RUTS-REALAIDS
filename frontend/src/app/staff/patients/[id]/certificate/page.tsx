@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Printer, Loader2, Save, AlertCircle } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import type { Certificate, Visit, User as UserType, InfirmaryInfo } from "@/types";
 
@@ -87,7 +87,7 @@ export default function CertificatePage({ params }: { params: Promise<{ id: stri
       setCertificate(res.data);
       setNotFound(false);
     } else {
-      setError(res.message ?? "เกิดข้อผิดพลาด");
+      setError(extractError(res));
     }
   };
 

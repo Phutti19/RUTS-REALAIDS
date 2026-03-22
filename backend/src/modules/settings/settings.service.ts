@@ -273,7 +273,7 @@ export class SettingsService {
       `SELECT id FROM users WHERE email = $1`,
       [dto.email],
     );
-    if (existing) throw new ConflictException('Email already registered');
+    if (existing) throw new ConflictException('อีเมลนี้ถูกใช้งานแล้ว');
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
 
@@ -304,7 +304,7 @@ export class SettingsService {
         `SELECT id FROM users WHERE email = $1 AND id != $2`,
         [dto.email, id],
       );
-      if (conflict) throw new ConflictException('Email already registered');
+      if (conflict) throw new ConflictException('อีเมลนี้ถูกใช้งานแล้ว');
       fields.push(`email = $${idx++}`);
       values.push(dto.email);
     }
@@ -339,7 +339,7 @@ export class SettingsService {
        RETURNING id, student_id, email, first_name, last_name, phone, role, is_active, created_at, faculty, department`,
       values,
     );
-    if (!row) throw new NotFoundException('User not found');
+    if (!row) throw new NotFoundException('ไม่พบผู้ใช้');
     return formatAdminUser(row);
   }
 
@@ -351,7 +351,7 @@ export class SettingsService {
        RETURNING id, student_id, email, first_name, last_name, phone, role, is_active, created_at, faculty, department`,
       [id],
     );
-    if (!row) throw new NotFoundException('User not found');
+    if (!row) throw new NotFoundException('ไม่พบผู้ใช้');
     return formatAdminUser(row);
   }
 
@@ -363,7 +363,7 @@ export class SettingsService {
        RETURNING id, student_id, email, first_name, last_name, phone, role, is_active, created_at, faculty, department`,
       [id],
     );
-    if (!row) throw new NotFoundException('User not found');
+    if (!row) throw new NotFoundException('ไม่พบผู้ใช้');
     return formatAdminUser(row);
   }
 
@@ -372,12 +372,12 @@ export class SettingsService {
       `SELECT student_id, role FROM users WHERE id = $1`,
       [id],
     );
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundException('ไม่พบผู้ใช้');
     if (user.role !== 'student') {
-      throw new BadRequestException('Password reset via student ID is only available for students');
+      throw new BadRequestException('การรีเซ็ตรหัสผ่านด้วยรหัสนักศึกษาใช้ได้เฉพาะบัญชีนักศึกษาเท่านั้น');
     }
     if (!user.student_id) {
-      throw new BadRequestException('Student has no student ID to reset password to');
+      throw new BadRequestException('นักศึกษาไม่มีรหัสนักศึกษาสำหรับรีเซ็ตรหัสผ่าน');
     }
 
     const passwordHash = await bcrypt.hash(user.student_id, BCRYPT_ROUNDS);
@@ -393,7 +393,7 @@ export class SettingsService {
        FROM users WHERE id = $1`,
       [id],
     );
-    if (!row) throw new NotFoundException('User not found');
+    if (!row) throw new NotFoundException('ไม่พบผู้ใช้');
     return formatAdminUser(row);
   }
 

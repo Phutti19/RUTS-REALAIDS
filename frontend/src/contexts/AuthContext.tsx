@@ -9,7 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { setAccessToken, clearAccessToken } from "@/lib/auth";
 import { wsClient } from "@/lib/websocket";
 import type { User } from "@/types";
@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       wsClient.connect();
       return { success: true, role: res.data.user.role };
     }
-    return { success: false, error: res.message ?? "เข้าสู่ระบบไม่สำเร็จ" };
+    return { success: false, error: extractError(res, "เข้าสู่ระบบไม่สำเร็จ") };
   }, []);
 
   const logout = useCallback(async () => {

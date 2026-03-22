@@ -237,7 +237,7 @@ export class MedicinesService {
     // Validate expiry date is in the future
     const expiry = new Date(dto.expiryDate);
     if (expiry <= new Date()) {
-      throw new BadRequestException('Expiry date must be in the future.');
+      throw new BadRequestException('วันหมดอายุต้องเป็นวันที่ในอนาคต');
     }
 
     const batch = await this.db.transaction(async (client) => {
@@ -298,7 +298,7 @@ export class MedicinesService {
         [dto.batchId, medicineId],
       );
       if (!batch) {
-        throw new BadRequestException('Batch not found for this medicine.');
+        throw new BadRequestException('ไม่พบ Batch นี้สำหรับยา/เวชภัณฑ์นี้');
       }
     }
 

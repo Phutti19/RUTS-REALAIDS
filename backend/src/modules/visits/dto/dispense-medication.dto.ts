@@ -11,14 +11,14 @@ import { Type, Transform } from 'class-transformer';
 
 export class DispenseMedicationDto {
   /** UUID of the medicine to dispense */
-  @IsUUID()
+  @IsUUID('4', { message: 'กรุณาเลือกยา/เวชภัณฑ์' })
   medicineId: string;
 
   /** Number of units to dispense (batch selected automatically by FIFO) */
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(10000)
+  @IsInt({ message: 'จำนวนต้องเป็นจำนวนเต็ม' })
+  @Min(1, { message: 'จำนวนต้องอย่างน้อย 1' })
+  @Max(10000, { message: 'จำนวนต้องไม่เกิน 10,000' })
   quantity: number;
 
   @IsOptional()

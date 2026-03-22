@@ -7,7 +7,7 @@ import {
   AlertCircle, Printer, Plus, Activity, Save,
   Stethoscope, Scissors, Moon, MessageSquare, AlertTriangle,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, extractError } from "@/lib/api";
 import { cn, formatDateTime, statusLabel } from "@/lib/utils";
 import type { Visit, VisitMedication, HealthProfile, VitalSigns, Medicine, User as UserType } from "@/types";
 
@@ -158,7 +158,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
       phone: demoPhone || null,
     });
     setSavingDemo(false);
-    setDemoMsg(res.success ? { type: "ok", text: "บันทึกสำเร็จ" } : { type: "err", text: res.message ?? "เกิดข้อผิดพลาด" });
+    setDemoMsg(res.success ? { type: "ok", text: "บันทึกสำเร็จ" } : { type: "err", text: extractError(res) });
   };
 
   const saveHealth = async () => {
@@ -177,7 +177,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
       emergencyContactRelation: hEcRel || null,
     });
     setSavingHealth(false);
-    setHealthMsg(res.success ? { type: "ok", text: "บันทึกสำเร็จ" } : { type: "err", text: res.message ?? "เกิดข้อผิดพลาด" });
+    setHealthMsg(res.success ? { type: "ok", text: "บันทึกสำเร็จ" } : { type: "err", text: extractError(res) });
   };
 
   const saveVisit = async () => {
@@ -189,8 +189,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
       consultationTypes, isReferred,
     });
     setSavingVisit(false);
-    const errText = res.errors?.length ? res.errors.join(" · ") : res.message ?? "เกิดข้อผิดพลาด";
-    setVisitMsg(res.success ? { type: "ok", text: "บันทึกสำเร็จ" } : { type: "err", text: errText });
+    setVisitMsg(res.success ? { type: "ok", text: "บันทึกสำเร็จ" } : { type: "err", text: extractError(res) });
   };
 
   const dispenseMed = async () => {
@@ -205,7 +204,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
       setSelectedMed(null); setMedQty(1); setDosage("");
       setMedMsg({ type: "ok", text: "จ่ายยาสำเร็จ" });
     } else {
-      setMedMsg({ type: "err", text: res.message ?? "เกิดข้อผิดพลาด" });
+      setMedMsg({ type: "err", text: extractError(res) });
     }
   };
 
@@ -226,8 +225,7 @@ export default function PatientVisitPage({ params }: { params: Promise<{ id: str
     setSavingVitals(true); setVitalsMsg(null);
     const res = await api.patch(`/visits/${id}`, { vitalSigns });
     setSavingVitals(false);
-    const errText = res.errors?.length ? res.errors.join(" · ") : res.message ?? "เกิดข้อผิดพลาด";
-    setVitalsMsg(res.success ? { type: "ok", text: "บันทึกสำเร็จ" } : { type: "err", text: errText });
+    setVitalsMsg(res.success ? { type: "ok", text: "บันทึกสำเร็จ" } : { type: "err", text: extractError(res) });
   };
 
   const toggleConsultation = (val: string) =>

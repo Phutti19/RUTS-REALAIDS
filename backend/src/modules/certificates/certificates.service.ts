@@ -191,7 +191,7 @@ export class CertificatesService {
     );
     if (!row) return null;
     if (callerRole === 'student' && row.patient_id !== callerId) {
-      throw new ForbiddenException('Access denied');
+      throw new ForbiddenException('คุณสามารถดูใบรับรองแพทย์ของคุณเท่านั้น');
     }
     return this.formatCertificate(row);
   }
@@ -211,7 +211,7 @@ export class CertificatesService {
     if (!row) throw new NotFoundException(`Certificate '${id}' not found`);
 
     if (callerRole === 'student' && row.patient_id !== callerId) {
-      throw new ForbiddenException('Access denied');
+      throw new ForbiddenException('คุณสามารถดูใบรับรองแพทย์ของคุณเท่านั้น');
     }
 
     return this.formatCertificate(row);
