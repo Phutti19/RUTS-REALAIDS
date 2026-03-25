@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -28,6 +29,9 @@ import { SettingsModule } from './modules/settings/settings.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+
+    // Rate limiting — 20 requests per 60 seconds per IP (global default)
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }]),
 
     // Core infrastructure
     ScheduleModule.forRoot(),

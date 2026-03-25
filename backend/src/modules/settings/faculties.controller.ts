@@ -66,7 +66,7 @@ export class FacultiesController {
   @Roles('admin')
   async deleteFaculty(@Param('id', ParseUUIDPipe) id: string) {
     await this.settingsService.deleteFaculty(id);
-    return { success: true, message: 'Deleted' };
+    return { success: true, message: 'ลบสำเร็จ' };
   }
 
   // ── Departments ───────────────────────────────────────────────────────────
@@ -104,6 +104,6 @@ export class FacultiesController {
   @Roles('admin')
   async deleteDepartment(@Param('id', ParseUUIDPipe) id: string) {
     await this.settingsService.deleteDepartment(id);
-    return { success: true, message: 'Deleted' };
+    return { success: true, message: 'ลบสำเร็จ' };
   }
 }

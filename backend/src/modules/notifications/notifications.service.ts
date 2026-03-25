@@ -171,8 +171,8 @@ export class NotificationsService implements OnModuleInit {
       `SELECT * FROM notifications WHERE id = $1`,
       [id],
     );
-    if (!existing) throw new NotFoundException(`Notification '${id}' not found.`);
-    if (existing.user_id !== userId) throw new ForbiddenException('Access denied.');
+    if (!existing) throw new NotFoundException('ไม่พบการแจ้งเตือน');
+    if (existing.user_id !== userId) throw new ForbiddenException('ไม่มีสิทธิ์เข้าถึง');
 
     const updated = await this.db.queryOne<NotificationRow>(
       `UPDATE notifications SET is_read = true, read_at = NOW() WHERE id = $1 RETURNING *`,
@@ -194,8 +194,8 @@ export class NotificationsService implements OnModuleInit {
       `SELECT id, user_id FROM notifications WHERE id = $1`,
       [id],
     );
-    if (!existing) throw new NotFoundException(`Notification '${id}' not found.`);
-    if (existing.user_id !== userId) throw new ForbiddenException('Access denied.');
+    if (!existing) throw new NotFoundException('ไม่พบการแจ้งเตือน');
+    if (existing.user_id !== userId) throw new ForbiddenException('ไม่มีสิทธิ์เข้าถึง');
 
     await this.db.execute(`DELETE FROM notifications WHERE id = $1`, [id]);
   }

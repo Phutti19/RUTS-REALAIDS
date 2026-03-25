@@ -3,7 +3,6 @@ import {
   IsDateString,
   IsOptional,
   IsString,
-  IsNotEmpty,
   MaxLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
@@ -20,12 +19,12 @@ export class CreateAppointmentDto {
   @IsDateString({}, { message: 'วันที่ต้องเป็นรูปแบบ YYYY-MM-DD' })
   date: string;
 
-  /** Reason for the appointment (required) */
+  /** Reason for the appointment (optional — defaults to notes if omitted) */
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'กรุณาระบุเหตุผลการนัดหมาย' })
   @MaxLength(255, { message: 'เหตุผลต้องไม่เกิน 255 ตัวอักษร' })
   @Transform(({ value }: { value: string }) => value?.trim())
-  reason: string;
+  reason?: string;
 
   /** Optional notes from the patient */
   @IsOptional()

@@ -121,7 +121,7 @@ export class AuthService {
     );
 
     this.logger.log(`New student registered: ${dto.email}`);
-    return { message: 'Registration successful. You can now log in.' };
+    return { message: 'ลงทะเบียนสำเร็จ สามารถเข้าสู่ระบบได้แล้ว' };
   }
 
   /**
@@ -234,7 +234,7 @@ export class AuthService {
   async forgotPassword(email: string): Promise<{ message: string; token?: string }> {
     // Generic message — never reveal whether email exists (prevents user enumeration)
     const genericMessage =
-      'If that email exists in our system, a reset link has been sent.';
+      'หากอีเมลนี้มีอยู่ในระบบ ลิงก์รีเซ็ตรหัสผ่านจะถูกส่งไปยังอีเมลของคุณ';
 
     const user = await this.db.queryOne<{ id: string }>(
       `SELECT id FROM users WHERE email = $1 AND is_active = true`,

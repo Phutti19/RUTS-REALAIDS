@@ -615,7 +615,7 @@ export class ReportsService {
     const from = dto.from ?? toDateStr(new Date(today.getFullYear(), today.getMonth(), 1));
 
     if (new Date(from) > new Date(to)) {
-      throw new BadRequestException(`'from' date must not be after 'to' date.`);
+      throw new BadRequestException('วันที่เริ่มต้นต้องไม่อยู่หลังวันที่สิ้นสุด');
     }
 
     return { from, to };

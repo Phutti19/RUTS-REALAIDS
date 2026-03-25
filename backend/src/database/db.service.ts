@@ -38,9 +38,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       host: this.config.get<string>('DATABASE_HOST', 'localhost'),
       port: this.config.get<number>('DATABASE_PORT', 5432),
       database: this.config.get<string>('DATABASE_NAME', 'ruts_realaids'),
-      user: this.config.get<string>('DATABASE_USER', 'realaids'),
-      password: this.config.get<string>('DATABASE_PASSWORD', 'realaids1234'),
-      max: 20,                    // max pool size
+      user: this.config.get<string>('DATABASE_USER'),
+      password: this.config.get<string>('DATABASE_PASSWORD'),
+      max: 50,                    // max pool size
       idleTimeoutMillis: 30_000,  // close idle clients after 30s
       connectionTimeoutMillis: 10_000,
     });
@@ -80,7 +80,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     } catch (err: unknown) {
       const error = err as Error;
       this.logger.error(`Query failed: ${error.message}\nSQL: ${text}`);
-      throw new InternalServerErrorException('Database query failed');
+      throw new InternalServerErrorException('เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล');
     }
   }
 

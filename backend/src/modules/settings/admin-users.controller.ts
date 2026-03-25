@@ -85,6 +85,6 @@ export class AdminUsersController {
   @HttpCode(HttpStatus.OK)
   async resetStudentPassword(@Param('id') id: string) {
     await this.settingsService.resetStudentPassword(id);
-    return { success: true, message: 'Password reset to student ID successfully' };
+    return { success: true, message: 'รีเซ็ตรหัสผ่านเป็นรหัสนักศึกษาสำเร็จ' };
   }
 }

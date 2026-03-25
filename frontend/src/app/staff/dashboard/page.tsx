@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Siren,
   Users,
@@ -138,6 +139,7 @@ function StatCard({ href, icon, label, value, sub, badge, color, alert }: StatCa
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function StaffDashboard() {
+  const router = useRouter();
   const { user } = useAuthContext();
   const [report, setReport] = useState<DashboardReport | null>(null);
   const [queue, setQueue] = useState<QueueVisit[]>([]);
@@ -413,7 +415,7 @@ export default function StaffDashboard() {
             <EmergencyMap
               incidents={activeIncidents}
               onSelectIncident={(inc) => {
-                window.location.href = `/staff/emergency?id=${inc.id}`;
+                router.push(`/staff/emergency?id=${inc.id}`);
               }}
               infirmaryLat={infirmaryLat}
               infirmaryLng={infirmaryLng}

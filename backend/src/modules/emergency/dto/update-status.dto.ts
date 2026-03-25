@@ -3,7 +3,7 @@ import { Transform } from 'class-transformer';
 
 export class UpdateStatusDto {
   @IsEnum(['in_progress', 'completed', 'cancelled'], {
-    message: 'status must be one of: in_progress, completed, cancelled',
+    message: 'สถานะต้องเป็น in_progress, completed หรือ cancelled',
   })
   status: string;
 

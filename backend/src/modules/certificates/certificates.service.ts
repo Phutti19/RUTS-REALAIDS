@@ -33,7 +33,7 @@ export class CertificatesService {
       `SELECT id FROM patient_visits WHERE id = $1`,
       [dto.visitId],
     );
-    if (!visit) throw new NotFoundException(`Visit '${dto.visitId}' not found`);
+    if (!visit) throw new NotFoundException('ไม่พบบันทึกการเข้ารับบริการ');
 
     // Enforce one certificate per visit
     const existing = await this.db.queryOne<{ id: string }>(
@@ -42,7 +42,7 @@ export class CertificatesService {
     );
     if (existing) {
       throw new ConflictException(
-        `A certificate already exists for visit '${dto.visitId}'.`,
+        'ใบรับรองแพทย์สำหรับการเข้ารับบริการนี้มีอยู่แล้ว',
       );
     }
 
@@ -208,7 +208,7 @@ export class CertificatesService {
       [id],
     );
 
-    if (!row) throw new NotFoundException(`Certificate '${id}' not found`);
+    if (!row) throw new NotFoundException('ไม่พบใบรับรองแพทย์');
 
     if (callerRole === 'student' && row.patient_id !== callerId) {
       throw new ForbiddenException('คุณสามารถดูใบรับรองแพทย์ของคุณเท่านั้น');

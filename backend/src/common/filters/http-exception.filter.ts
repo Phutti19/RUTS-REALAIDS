@@ -34,7 +34,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'An unexpected error occurred';
+    let message = 'เกิดข้อผิดพลาดที่ไม่คาดคิด';
     let validationErrors: unknown[] | undefined;
 
     if (exception instanceof HttpException) {
@@ -48,7 +48,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         // class-validator returns { message: string[] } for validation errors
         if (Array.isArray(bodyObj.message)) {
           validationErrors = bodyObj.message as unknown[];
-          message = 'Validation failed';
+          message = 'ข้อมูลไม่ถูกต้อง';
         } else {
           message = (bodyObj.message as string) || message;
         }

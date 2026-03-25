@@ -220,7 +220,7 @@ export class UsersService {
       [id],
     );
 
-    if (!user) throw new NotFoundException(`User with id '${id}' not found`);
+    if (!user) throw new NotFoundException('ไม่พบผู้ใช้');
     return this.formatProfile(user);
   }
 
@@ -277,7 +277,7 @@ export class UsersService {
       values,
     );
 
-    if (!updated) throw new NotFoundException(`Patient '${patientId}' not found`);
+    if (!updated) throw new NotFoundException('ไม่พบผู้ป่วย');
     return this.formatProfile(updated);
   }
 

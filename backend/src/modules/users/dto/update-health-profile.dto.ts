@@ -18,7 +18,7 @@ enum BloodTypeEnum {
 
 export class UpdateHealthProfileDto {
   @IsOptional()
-  @IsEnum(BloodTypeEnum, { message: 'Invalid blood type. Use A+, A-, B+, B-, AB+, AB-, O+, O-' })
+  @IsEnum(BloodTypeEnum, { message: 'กรุ๊ปเลือดไม่ถูกต้อง กรุณาใช้ A, B, AB, O, A+, A-, B+, B-, AB+, AB-, O+ หรือ O-' })
   bloodType?: string;
 
   @IsOptional()

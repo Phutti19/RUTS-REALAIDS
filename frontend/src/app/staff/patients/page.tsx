@@ -310,6 +310,16 @@ export default function PatientsPage() {
             </div>
           </div>
 
+          {/* Register new patient button — always visible */}
+          {!selectedPatient && !showRegForm && (
+            <button
+              onClick={openRegForm}
+              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors"
+            >
+              <UserPlus size={16} /> ลงทะเบียนผู้ป่วยใหม่
+            </button>
+          )}
+
           {/* Search results */}
           {patientResults.length > 0 && !selectedPatient && (
             <div className="grid gap-2">
@@ -336,16 +346,10 @@ export default function PatientsPage() {
             </div>
           )}
 
-          {/* Not found → offer register */}
+          {/* Not found message */}
           {searched && !searching && patientResults.length === 0 && !selectedPatient && !showRegForm && (
-            <div className="rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 p-5 text-center space-y-3">
+            <div className="rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 p-4 text-center">
               <p className="text-sm text-gray-500 dark:text-gray-400">ไม่พบผู้ป่วยในระบบ</p>
-              <button
-                onClick={openRegForm}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors"
-              >
-                <UserPlus size={16} /> ลงทะเบียนผู้ป่วยใหม่
-              </button>
             </div>
           )}
 

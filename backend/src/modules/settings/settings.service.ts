@@ -202,7 +202,7 @@ export class SettingsService {
        RETURNING key, value, description, updated_by, updated_at`,
       [dto.value, updatedBy, key],
     );
-    if (!row) throw new NotFoundException(`Setting '${key}' not found`);
+    if (!row) throw new NotFoundException('ไม่พบการตั้งค่า');
     return formatSetting(row);
   }
 
@@ -450,7 +450,7 @@ export class SettingsService {
         [backupId],
       );
       this.logger.error(`Backup failed: ${(err as Error).message}`);
-      throw new InternalServerErrorException('Backup creation failed.');
+      throw new InternalServerErrorException('การสร้างข้อมูลสำรองล้มเหลว');
     }
   }
 
@@ -468,15 +468,15 @@ export class SettingsService {
       `SELECT id, filename, status FROM data_backups WHERE id = $1`,
       [id],
     );
-    if (!row) throw new NotFoundException('Backup not found');
+    if (!row) throw new NotFoundException('ไม่พบข้อมูลสำรอง');
     if (row.status !== 'completed') {
-      throw new BadRequestException(`Backup is not ready (status: ${row.status})`);
+      throw new BadRequestException('ข้อมูลสำรองยังไม่พร้อม');
     }
     const backupDir =
       this.config.get<string>('BACKUP_DIR') ?? path.join(process.cwd(), 'backups');
     const filePath = path.join(backupDir, row.filename);
     if (!fs.existsSync(filePath)) {
-      throw new NotFoundException('Backup file not found on disk');
+      throw new NotFoundException('ไม่พบไฟล์สำรองข้อมูลบนดิสก์');
     }
     const buffer = fs.readFileSync(filePath);
     return { filename: row.filename, buffer };
@@ -534,7 +534,7 @@ export class SettingsService {
          FROM emergency_contacts_directory WHERE id = $1`,
         [id],
       );
-      if (!existing) throw new NotFoundException('Emergency contact not found');
+      if (!existing) throw new NotFoundException('ไม่พบข้อมูลหน่วยงานฉุกเฉิน');
       return formatContact(existing);
     }
 
@@ -548,7 +548,7 @@ export class SettingsService {
        RETURNING id, name, category, phone, note, created_at, updated_at`,
       values,
     );
-    if (!row) throw new NotFoundException('Emergency contact not found');
+    if (!row) throw new NotFoundException('ไม่พบข้อมูลหน่วยงานฉุกเฉิน');
     return formatContact(row);
   }
 
@@ -557,7 +557,7 @@ export class SettingsService {
       `DELETE FROM emergency_contacts_directory WHERE id = $1`,
       [id],
     );
-    if (count === 0) throw new NotFoundException('Emergency contact not found');
+    if (count === 0) throw new NotFoundException('ไม่พบข้อมูลหน่วยงานฉุกเฉิน');
   }
 
   // ── Audit Logs ────────────────────────────────────────────────────────────
@@ -626,7 +626,7 @@ export class SettingsService {
       `SELECT id FROM treatment_types WHERE LOWER(name) = LOWER($1)`,
       [dto.name],
     );
-    if (existing) throw new ConflictException('Treatment type name already exists');
+    if (existing) throw new ConflictException('ชื่อประเภทการรักษานี้มีอยู่แล้ว');
 
     const row = await this.db.queryOne<TreatmentTypeRow>(
       `INSERT INTO treatment_types (id, name)
@@ -645,7 +645,7 @@ export class SettingsService {
        RETURNING id, name, is_active, created_at`,
       [id],
     );
-    if (!row) throw new NotFoundException('Treatment type not found');
+    if (!row) throw new NotFoundException('ไม่พบประเภทการรักษา');
     return formatTreatmentType(row);
   }
 
@@ -661,7 +661,7 @@ export class SettingsService {
       `DELETE FROM treatment_types WHERE id = $1`,
       [id],
     );
-    if (affected === 0) throw new NotFoundException('Treatment type not found');
+    if (affected === 0) throw new NotFoundException('ไม่พบประเภทการรักษา');
   }
 
   // ── Faculties ──────────────────────────────────────────────────────────────

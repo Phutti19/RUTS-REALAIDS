@@ -17,6 +17,8 @@ import {
   ArrowLeft,
   Activity,
   Zap,
+  Map,
+  List,
 } from "lucide-react";
 import { api, extractError } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -66,6 +68,7 @@ function EmergencyPageContent() {
   const [infirmaryLat, setInfirmaryLat] = useState<number | undefined>(undefined);
   const [infirmaryLng, setInfirmaryLng] = useState<number | undefined>(undefined);
   const [completedLimit, setCompletedLimit] = useState(10);
+  const [mobileView, setMobileView] = useState<"list" | "map">("list");
 
   const loadIncidents = useCallback(async () => {
     const [pendingRes, inProgressRes, completedRes] = await Promise.all([
@@ -207,11 +210,25 @@ function EmergencyPageContent() {
         </div>
       </div>
 
+      {/* ── Mobile: List/Map toggle ─────────────────────────── */}
+      <div className="flex lg:hidden gap-2 flex-shrink-0">
+        <button onClick={() => setMobileView("list")}
+          className={cn("flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all",
+            mobileView === "list" ? "bg-gray-900 dark:bg-white border-gray-900 dark:border-white text-white dark:text-gray-900" : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500")}>
+          <List size={16} /> รายการ
+        </button>
+        <button onClick={() => setMobileView("map")}
+          className={cn("flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all",
+            mobileView === "map" ? "bg-gray-900 dark:bg-white border-gray-900 dark:border-white text-white dark:text-gray-900" : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500")}>
+          <Map size={16} /> แผนที่
+        </button>
+      </div>
+
       {/* ── Main 2-column ──────────────────────────────────── */}
-      <div className="flex gap-4 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
 
         {/* ── Left: Tabs + List ────── */}
-        <div className="w-[420px] flex-shrink-0 flex flex-col min-h-0">
+        <div className={cn("lg:w-[420px] lg:flex-shrink-0 flex flex-col min-h-0", mobileView === "map" ? "hidden lg:flex" : "flex")}>
 
           {/* Tabs */}
           <div className="flex gap-2 flex-shrink-0 mb-3">
@@ -293,7 +310,7 @@ function EmergencyPageContent() {
         </div>
 
         {/* ── Right: Map or Detail ──── */}
-        <div className="flex-1 min-h-0 min-w-0">
+        <div className={cn("flex-1 min-h-0 min-w-0", mobileView === "list" && !showDetail ? "hidden lg:block" : "block")}>
           {showDetail ? (
             <div className="h-full">
               <IncidentDetailPanel
@@ -306,7 +323,7 @@ function EmergencyPageContent() {
               />
             </div>
           ) : (
-            <div className="h-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col" style={{ minHeight: 500 }}>
+            <div className="h-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col min-h-[400px] lg:min-h-[500px]">
               {/* Map header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
                 <div className="flex items-center gap-2">

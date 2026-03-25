@@ -44,7 +44,7 @@ export class VisitsService {
       `SELECT id FROM users WHERE id = $1 AND is_active = true`,
       [dto.patientId],
     );
-    if (!patient) throw new NotFoundException(`Patient '${dto.patientId}' not found`);
+    if (!patient) throw new NotFoundException('ไม่พบผู้ป่วย');
 
     // Verify linked incident exists (if provided)
     if (dto.incidentId) {
@@ -52,7 +52,7 @@ export class VisitsService {
         `SELECT id FROM emergency_incidents WHERE id = $1`,
         [dto.incidentId],
       );
-      if (!incident) throw new NotFoundException(`Incident '${dto.incidentId}' not found`);
+      if (!incident) throw new NotFoundException('ไม่พบเหตุฉุกเฉิน');
     }
 
     const row = await this.db.queryOne<VisitRow>(
@@ -217,7 +217,7 @@ export class VisitsService {
       [id],
     );
 
-    if (!row) throw new NotFoundException(`Visit '${id}' not found`);
+    if (!row) throw new NotFoundException('ไม่พบบันทึกการเข้ารับบริการ');
 
     if (callerRole === 'student' && row.patient_id !== callerId) {
       throw new ForbiddenException('คุณสามารถดูได้เฉพาะการเข้ารับบริการของคุณเท่านั้น');
@@ -237,7 +237,7 @@ export class VisitsService {
       `SELECT * FROM patient_visits WHERE id = $1`,
       [id],
     );
-    if (!current) throw new NotFoundException(`Visit '${id}' not found`);
+    if (!current) throw new NotFoundException('ไม่พบบันทึกการเข้ารับบริการ');
 
     const fields: string[] = [];
     const values: unknown[] = [];
@@ -350,7 +350,7 @@ export class VisitsService {
       `SELECT id, status FROM patient_visits WHERE id = $1`,
       [visitId],
     );
-    if (!visit) throw new NotFoundException(`Visit '${visitId}' not found`);
+    if (!visit) throw new NotFoundException('ไม่พบบันทึกการเข้ารับบริการ');
     if (visit.status === 'completed' || visit.status === 'referred') {
       throw new BadRequestException(
         `ไม่สามารถจ่ายยาได้เนื่องจากสถานะการรักษาเป็น "${visit.status}" (ต้องเป็น waiting หรือ in_treatment)`,
@@ -367,7 +367,7 @@ export class VisitsService {
       `SELECT id, name, stock_quantity, min_stock_level FROM medicines WHERE id = $1`,
       [dto.medicineId],
     );
-    if (!medicine) throw new NotFoundException(`Medicine '${dto.medicineId}' not found`);
+    if (!medicine) throw new NotFoundException('ไม่พบยา/เวชภัณฑ์');
     if (medicine.stock_quantity < dto.quantity) {
       throw new BadRequestException(
         `สต็อกไม่เพียงพอ (คงเหลือ: ${medicine.stock_quantity}, ต้องการ: ${dto.quantity})`,
@@ -394,8 +394,7 @@ export class VisitsService {
 
       if (batchResult.rows.length === 0) {
         throw new BadRequestException(
-          `No single batch has ${dto.quantity} units of available (non-expired) stock. ` +
-            `Check individual batch quantities and expiry dates.`,
+          `ไม่มี Batch ใดที่มีสต็อก ${dto.quantity} หน่วยที่ยังไม่หมดอายุ กรุณาตรวจสอบจำนวนและวันหมดอายุของแต่ละ Batch`,
         );
       }
 
@@ -489,7 +488,7 @@ export class VisitsService {
       `SELECT id, patient_id FROM patient_visits WHERE id = $1`,
       [visitId],
     );
-    if (!visit) throw new NotFoundException(`Visit '${visitId}' not found`);
+    if (!visit) throw new NotFoundException('ไม่พบบันทึกการเข้ารับบริการ');
     if (callerRole === 'student' && visit.patient_id !== callerId) {
       throw new ForbiddenException('คุณสามารถดูรายการยาของการรักษาของคุณเท่านั้น');
     }

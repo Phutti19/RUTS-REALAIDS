@@ -214,7 +214,7 @@ export class EmergencyService {
       [id],
     );
 
-    if (!row) throw new NotFoundException(`Incident '${id}' not found`);
+    if (!row) throw new NotFoundException('ไม่พบเหตุฉุกเฉิน');
 
     // Students can only view their own incidents
     if (callerRole === 'student' && row.reporter_id !== callerId) {
@@ -236,10 +236,10 @@ export class EmergencyService {
       `SELECT id, status, reporter_id FROM emergency_incidents WHERE id = $1`,
       [incidentId],
     );
-    if (!current) throw new NotFoundException(`Incident '${incidentId}' not found`);
+    if (!current) throw new NotFoundException('ไม่พบเหตุฉุกเฉิน');
     if (current.status !== 'pending') {
       throw new BadRequestException(
-        `Cannot accept incident in status '${current.status}'. Only pending incidents can be accepted.`,
+        'ไม่สามารถรับเหตุฉุกเฉินในสถานะปัจจุบันได้ สามารถรับได้เฉพาะเหตุที่อยู่ในสถานะรอดำเนินการเท่านั้น',
       );
     }
 
@@ -287,13 +287,12 @@ export class EmergencyService {
       `SELECT id, status, reporter_id FROM emergency_incidents WHERE id = $1`,
       [incidentId],
     );
-    if (!current) throw new NotFoundException(`Incident '${incidentId}' not found`);
+    if (!current) throw new NotFoundException('ไม่พบเหตุฉุกเฉิน');
 
     const allowed = VALID_TRANSITIONS[current.status] ?? [];
     if (!allowed.includes(dto.status)) {
       throw new BadRequestException(
-        `Cannot transition from '${current.status}' to '${dto.status}'. ` +
-          `Valid transitions: ${allowed.join(', ') || 'none'}`,
+        `ไม่สามารถเปลี่ยนสถานะได้ สถานะที่สามารถเปลี่ยนได้จากสถานะปัจจุบัน: ${allowed.join(', ') || 'ไม่มี'}`,
       );
     }
 
@@ -337,9 +336,9 @@ export class EmergencyService {
       `SELECT id, reporter_id FROM emergency_incidents WHERE id = $1`,
       [incidentId],
     );
-    if (!incident) throw new NotFoundException(`Incident '${incidentId}' not found`);
+    if (!incident) throw new NotFoundException('ไม่พบเหตุฉุกเฉิน');
     if (callerRole === 'student' && incident.reporter_id !== callerId) {
-      throw new ForbiddenException('You can only add images to your own incidents');
+      throw new ForbiddenException('คุณสามารถเพิ่มรูปภาพเฉพาะเหตุฉุกเฉินที่คุณแจ้งเท่านั้น');
     }
 
     const row = await this.db.queryOne<IncidentImageRow>(
@@ -380,7 +379,7 @@ export class EmergencyService {
       `SELECT id, reporter_id FROM emergency_incidents WHERE id = $1`,
       [incidentId],
     );
-    if (!incident) throw new NotFoundException(`Incident '${incidentId}' not found`);
+    if (!incident) throw new NotFoundException('ไม่พบเหตุฉุกเฉิน');
     if (callerRole === 'student' && incident.reporter_id !== callerId) {
       throw new ForbiddenException('คุณสามารถดูสถานะเหตุฉุกเฉินที่คุณแจ้งเท่านั้น');
     }
@@ -393,6 +392,93 @@ export class EmergencyService {
       [incidentId],
     );
     return rows.map((r) => this.formatStatusLog(r));
+  }
+
+  // ── Confirm completed ────────────────────────────────────────────────────────
+
+  /**
+   * Student confirms they received help after staff marks incident completed.
+   * Inserts a status log with old_status='completed', new_status='completed'
+   * and a special note prefix so we can detect confirmation.
+   */
+  async confirmCompleted(
+    incidentId: string,
+    studentId: string,
+  ): Promise<{ confirmed: boolean }> {
+    const incident = await this.db.queryOne<{
+      id: string;
+      status: string;
+      reporter_id: string;
+    }>(
+      `SELECT id, status, reporter_id FROM emergency_incidents WHERE id = $1`,
+      [incidentId],
+    );
+    if (!incident) throw new NotFoundException('ไม่พบเหตุฉุกเฉิน');
+    if (incident.reporter_id !== studentId) {
+      throw new ForbiddenException('คุณสามารถยืนยันเหตุฉุกเฉินที่คุณแจ้งเท่านั้น');
+    }
+    if (incident.status !== 'completed') {
+      throw new BadRequestException('สามารถยืนยันได้เฉพาะเหตุฉุกเฉินที่เสร็จสิ้นแล้ว');
+    }
+
+    // Check if already confirmed
+    const existing = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM incident_status_logs
+       WHERE incident_id = $1 AND note LIKE '[CONFIRMED]%'`,
+      [incidentId],
+    );
+    if (existing) return { confirmed: true };
+
+    await this.db.query(
+      `INSERT INTO incident_status_logs (incident_id, changed_by, old_status, new_status, note)
+       VALUES ($1, $2, 'completed', 'completed', '[CONFIRMED] ผู้แจ้งยืนยันว่าได้รับการช่วยเหลือแล้ว')`,
+      [incidentId, studentId],
+    );
+
+    this.logger.log(`Incident ${incidentId} confirmed by reporter ${studentId}`);
+    return { confirmed: true };
+  }
+
+  /**
+   * Check if an incident has been confirmed by reporter.
+   */
+  async isConfirmed(incidentId: string): Promise<boolean> {
+    const row = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM incident_status_logs
+       WHERE incident_id = $1 AND note LIKE '[CONFIRMED]%'`,
+      [incidentId],
+    );
+    return !!row;
+  }
+
+  /**
+   * Auto-confirm completed incidents older than 24 hours without confirmation.
+   * Called by cron job.
+   */
+  async autoConfirmStaleIncidents(): Promise<number> {
+    const staleRows = await this.db.queryMany<{ id: string }>(
+      `SELECT ei.id
+       FROM emergency_incidents ei
+       WHERE ei.status = 'completed'
+         AND ei.updated_at < NOW() - INTERVAL '24 hours'
+         AND NOT EXISTS (
+           SELECT 1 FROM incident_status_logs isl
+           WHERE isl.incident_id = ei.id AND isl.note LIKE '[CONFIRMED]%'
+         )`,
+    );
+
+    for (const row of staleRows) {
+      await this.db.query(
+        `INSERT INTO incident_status_logs (incident_id, changed_by, old_status, new_status, note)
+         VALUES ($1, NULL, 'completed', 'completed', '[CONFIRMED] ยืนยันอัตโนมัติ (หมดเวลา 24 ชม.)')`,
+        [row.id],
+      );
+    }
+
+    if (staleRows.length > 0) {
+      this.logger.log(`Auto-confirmed ${staleRows.length} stale completed incidents`);
+    }
+    return staleRows.length;
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────

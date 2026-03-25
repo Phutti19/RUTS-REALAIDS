@@ -8,7 +8,7 @@ export class RescheduleAppointmentDto {
 
   @IsString()
   @IsNotEmpty()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'date must be in YYYY-MM-DD format' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'วันที่ต้องเป็นรูปแบบ YYYY-MM-DD' })
   date: string;
 
   @IsOptional()

@@ -3,6 +3,9 @@ import path from "path";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  experimental: {
+    optimizeCss: true,
+  },
   turbopack: {
     // Prevent Next.js from selecting the monorepo root as the workspace root
     root: path.resolve(__dirname),
@@ -24,14 +27,6 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "iot666.ddns.net",
-      },
-      {
-        protocol: "http",
-        hostname: "**",
-      },
-      {
-        protocol: "https",
-        hostname: "**",
       },
     ],
   },

@@ -479,31 +479,31 @@ export default function StaffAppointmentsPage() {
                         )}
 
                         {(apt.status === "scheduled" || apt.status === "checked_in") && (
-                          <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                          <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                             {apt.status === "scheduled" && (
                               <button onClick={() => checkIn(apt.id)} disabled={isLoading}
-                                className="flex items-center gap-2 text-sm bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl transition-colors disabled:opacity-50 font-semibold">
+                                className="flex items-center gap-1.5 text-xs sm:text-sm bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-xl transition-colors disabled:opacity-50 font-semibold">
                                 {isLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                                 เช็คอิน
                               </button>
                             )}
                             {apt.status === "scheduled" && (
                               <button onClick={() => openRescheduleDialog(apt)}
-                                className="flex items-center gap-2 text-sm bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-400 px-4 py-2 rounded-xl transition-colors font-semibold">
+                                className="flex items-center gap-1.5 text-xs sm:text-sm bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-400 px-3 sm:px-4 py-2 rounded-xl transition-colors font-semibold">
                                 <CalendarClock size={14} />
                                 เลื่อนนัด
                               </button>
                             )}
                             {apt.status === "checked_in" && (
                               <button onClick={() => markNoShow(apt.id)} disabled={isLoading}
-                                className="flex items-center gap-2 text-sm bg-orange-100 hover:bg-orange-200 dark:bg-orange-900/30 dark:hover:bg-orange-900/50 text-orange-700 dark:text-orange-400 px-4 py-2 rounded-xl transition-colors disabled:opacity-50 font-semibold">
+                                className="flex items-center gap-1.5 text-xs sm:text-sm bg-orange-100 hover:bg-orange-200 dark:bg-orange-900/30 dark:hover:bg-orange-900/50 text-orange-700 dark:text-orange-400 px-3 sm:px-4 py-2 rounded-xl transition-colors disabled:opacity-50 font-semibold">
                                 {isLoading ? <Loader2 size={14} className="animate-spin" /> : <AlertCircle size={14} />}
                                 ไม่มา
                               </button>
                             )}
                             {apt.status === "scheduled" && (
                               <button onClick={() => openCancelDialog(apt)}
-                                className="flex items-center gap-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-red-50 dark:hover:bg-red-950/20 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 px-4 py-2 rounded-xl transition-colors font-semibold">
+                                className="flex items-center gap-1.5 text-xs sm:text-sm bg-gray-100 dark:bg-gray-700 hover:bg-red-50 dark:hover:bg-red-950/20 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 px-3 sm:px-4 py-2 rounded-xl transition-colors font-semibold">
                                 <XCircle size={14} />
                                 ยกเลิก
                               </button>

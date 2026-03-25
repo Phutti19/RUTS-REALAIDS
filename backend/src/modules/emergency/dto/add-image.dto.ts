@@ -3,7 +3,7 @@ import { IsString, IsOptional, IsUrl, IsInt, MaxLength, Min } from 'class-valida
 export class AddImageDto {
   /** Publicly accessible URL of the uploaded image */
   @IsString()
-  @IsUrl({}, { message: 'imageUrl must be a valid URL' })
+  @IsUrl({}, { message: 'URL ของรูปภาพไม่ถูกต้อง' })
   @MaxLength(2000)
   imageUrl: string;
 

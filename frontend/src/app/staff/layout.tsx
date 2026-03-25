@@ -295,7 +295,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         </header>
 
         {/* Page content */}
-        <main className="page-enter flex-1 overflow-auto p-5 lg:p-6">{children}</main>
+        <main className="flex-1 overflow-auto p-5 lg:p-6">{children}</main>
       </div>
     </div>
   );

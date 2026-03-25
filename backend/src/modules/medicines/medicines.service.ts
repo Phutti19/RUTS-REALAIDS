@@ -44,7 +44,7 @@ export class MedicinesService {
       [dto.name],
     );
     if (existing) {
-      throw new ConflictException(`A medicine named '${dto.name}' already exists.`);
+      throw new ConflictException('ยา/เวชภัณฑ์ชื่อนี้มีอยู่ในระบบแล้ว');
     }
 
     const row = await this.db.queryOne<MedicineRow>(
@@ -131,7 +131,7 @@ export class MedicinesService {
       `SELECT * FROM medicines WHERE id = $1`,
       [id],
     );
-    if (!row) throw new NotFoundException(`Medicine '${id}' not found`);
+    if (!row) throw new NotFoundException('ไม่พบยา/เวชภัณฑ์');
     return this.formatMedicine(row);
   }
 
@@ -147,7 +147,7 @@ export class MedicinesService {
         [dto.name, id],
       );
       if (conflict) {
-        throw new ConflictException(`A medicine named '${dto.name}' already exists.`);
+        throw new ConflictException('ยา/เวชภัณฑ์ชื่อนี้มีอยู่ในระบบแล้ว');
       }
     }
 
@@ -205,7 +205,7 @@ export class MedicinesService {
     );
     if (inUse && parseInt(inUse.count, 10) > 0) {
       throw new ConflictException(
-        'Medicine cannot be deleted because it is referenced by patient visit records.',
+        'ไม่สามารถลบยา/เวชภัณฑ์ได้ เนื่องจากมีการใช้งานในบันทึกการรักษา',
       );
     }
 
@@ -288,7 +288,7 @@ export class MedicinesService {
     await this.getMedicineById(medicineId); // throws NotFoundException if missing
 
     if (dto.quantityChange === 0) {
-      throw new BadRequestException('quantityChange cannot be 0');
+      throw new BadRequestException('จำนวนที่เปลี่ยนแปลงต้องไม่เป็น 0');
     }
 
     // Validate batch belongs to this medicine (if provided)

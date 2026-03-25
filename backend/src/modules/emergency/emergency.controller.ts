@@ -166,6 +166,34 @@ export class EmergencyController {
     return { success: true, data };
   }
 
+  // ── Confirm completed ────────────────────────────────────────────────────────
+
+  /**
+   * POST /api/v1/incidents/:id/confirm
+   * Student confirms they received help.
+   * Available to: the reporter (student) only
+   */
+  @Post(':id/confirm')
+  @HttpCode(HttpStatus.OK)
+  async confirmCompleted(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    const data = await this.emergencyService.confirmCompleted(id, userId);
+    return { success: true, data };
+  }
+
+  /**
+   * GET /api/v1/incidents/:id/confirmed
+   * Check if incident has been confirmed by reporter.
+   * Available to: all authenticated users
+   */
+  @Get(':id/confirmed')
+  async isConfirmed(@Param('id', ParseUUIDPipe) id: string) {
+    const confirmed = await this.emergencyService.isConfirmed(id);
+    return { success: true, data: { confirmed } };
+  }
+
   // ── Status logs ───────────────────────────────────────────────────────────────
 
   /**

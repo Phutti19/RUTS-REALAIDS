@@ -21,12 +21,12 @@ export class UpdateSlotDto {
 
   @IsOptional()
   @IsString()
-  @Matches(TIME_REGEX, { message: 'startTime must be HH:MM or HH:MM:SS' })
+  @Matches(TIME_REGEX, { message: 'เวลาเริ่มต้องเป็นรูปแบบ HH:MM หรือ HH:MM:SS' })
   startTime?: string;
 
   @IsOptional()
   @IsString()
-  @Matches(TIME_REGEX, { message: 'endTime must be HH:MM or HH:MM:SS' })
+  @Matches(TIME_REGEX, { message: 'เวลาสิ้นสุดต้องเป็นรูปแบบ HH:MM หรือ HH:MM:SS' })
   endTime?: string;
 
   @IsOptional()

@@ -693,8 +693,22 @@ async function testMedicines() {
 }
 
 // ── MODULE 7: APPOINTMENTS ────────────────────────────────────────────────────
+
+/** Find the next date (YYYY-MM-DD, local time) that falls on the given dayOfWeek (0=Sun..6=Sat). */
+function nextWeekday(dow) {
+  const d = new Date();
+  d.setDate(d.getDate() + ((dow + 7 - d.getDay()) % 7 || 7));
+  const yyyy = d.getFullYear();
+  const mm   = String(d.getMonth() + 1).padStart(2, '0');
+  const dd   = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 async function testAppointments() {
   section('MODULE 7 — APPOINTMENTS');
+
+  const nextMonday    = nextWeekday(1); // for slot dayOfWeek=1
+  const nextWednesday = nextWeekday(3); // for slot dayOfWeek=3
 
   await test('7.1 POST /appointment-slots (Monday) → 201', async () => {
     const r = await api('POST', '/appointment-slots', {
@@ -707,9 +721,8 @@ async function testAppointments() {
     state.slotId = r.body.data.id;
   });
 
-  // 2026-03-02 is a Monday
-  await test('7.2 GET /appointment-slots/available?date=2026-03-02 → slots list', async () => {
-    const r = await api('GET', '/appointment-slots/available?date=2026-03-02', { token: state.studentToken, expectedStatus: 200 });
+  await test(`7.2 GET /appointment-slots/available?date=${nextMonday} → slots list`, async () => {
+    const r = await api('GET', `/appointment-slots/available?date=${nextMonday}`, { token: state.studentToken, expectedStatus: 200 });
     assert(r.body.success, 'success must be true');
     assert(Array.isArray(r.body.data), 'data must be array');
   });
@@ -719,7 +732,7 @@ async function testAppointments() {
       token: state.studentToken,
       body: {
         slotId: state.slotId,
-        date: '2026-03-02',
+        date: nextMonday,
         notes: 'Follow up on sprained ankle',
       },
       expectedStatus: 201,
@@ -759,7 +772,7 @@ async function testAppointments() {
   });
 
   await test('7.8 PATCH /appointments/:id/cancel → cancelled (second booking)', async () => {
-    // Book another appointment on Wednesday 2026-03-04
+    // Book another appointment on next Wednesday
     const slot2R = await api('POST', '/appointment-slots', {
       token: state.staffToken,
       body: { dayOfWeek: 3, startTime: '13:00', endTime: '16:00', slotDurationMinutes: 30, maxPatientsPerSlot: 1 },
@@ -769,7 +782,7 @@ async function testAppointments() {
 
     const appt2R = await api('POST', '/appointments', {
       token: state.studentToken,
-      body: { slotId: slot2Id, date: '2026-03-04', notes: 'Check up' },
+      body: { slotId: slot2Id, date: nextWednesday, notes: 'Check up' },
       expectedStatus: 201,
     });
     const appt2Id = appt2R.body.data.id;

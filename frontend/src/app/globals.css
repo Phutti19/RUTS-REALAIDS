@@ -107,6 +107,15 @@ html {
 .header-enter  { animation: fadeInDown  0.3s  ease both; }
 .nav-slide-up  { animation: slideUpFade 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
+/* ── Page transition (template.tsx) — replays on every navigation ────────── */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-page-in {
+  animation: pageIn 0.25s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
 /* ── Staggered sidebar nav links ──────────────────────────────────────────── */
 .sidebar-nav a              { animation: navItemIn 0.3s ease both; }
 .sidebar-nav a:nth-child(1) { animation-delay: 0.06s; }

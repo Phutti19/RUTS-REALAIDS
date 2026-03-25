@@ -2,7 +2,7 @@ import { IsString, IsNotEmpty, MinLength, MaxLength, Matches } from 'class-valid
 
 export class ResetPasswordDto {
   @IsString()
-  @IsNotEmpty({ message: 'Reset token is required' })
+  @IsNotEmpty({ message: 'กรุณาระบุ Token สำหรับรีเซ็ตรหัสผ่าน' })
   token: string;
 
   @IsString()

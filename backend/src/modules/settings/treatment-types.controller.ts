@@ -45,6 +45,6 @@ export class TreatmentTypesController {
   @Delete(':id')
   async deleteTreatmentType(@Param('id') id: string) {
     await this.settingsService.deleteTreatmentType(id);
-    return { success: true, message: 'Deleted' };
+    return { success: true, message: 'ลบสำเร็จ' };
   }
 }

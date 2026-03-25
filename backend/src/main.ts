@@ -3,6 +3,8 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
+import { json, urlencoded } from 'express';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -15,7 +17,29 @@ async function bootstrap() {
   });
 
   // ── Security headers ──
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https:', 'http:'],
+          connectSrc: ["'self'", 'ws:', 'wss:'],
+          fontSrc: ["'self'", 'data:'],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'none'"],
+        },
+      },
+    }),
+  );
+
+  // ── Gzip compression — reduces response size 50-70% ──
+  app.use(compression());
+
+  // ── Body size limits — prevent oversized payloads ──
+  app.use(json({ limit: '10mb' }));
+  app.use(urlencoded({ extended: true, limit: '10mb' }));
 
   // ── Cookie parser (required for httpOnly refresh token cookies) ──
   app.use(cookieParser());

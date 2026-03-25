@@ -4,11 +4,11 @@ import { Transform } from 'class-transformer';
 export class LoginDto {
   /** Accepts email address or student ID (12-digit) */
   @IsString()
-  @IsNotEmpty({ message: 'Email or student ID is required' })
+  @IsNotEmpty({ message: 'กรุณาระบุอีเมลหรือรหัสนักศึกษา' })
   @Transform(({ value }: { value: string }) => value?.toLowerCase().trim())
   email: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Password is required' })
+  @IsNotEmpty({ message: 'กรุณาระบุรหัสผ่าน' })
   password: string;
 }

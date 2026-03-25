@@ -45,7 +45,7 @@ export default function StudentLayout({
   return (
     <div className="portal-page min-h-[100dvh] bg-slate-200 dark:bg-gray-950 student-portal-wrapper">
       {/* On tablet+: the content column appears as a centered card */}
-      <main className="page-enter max-w-md sm:max-w-xl md:max-w-2xl mx-auto bg-slate-100 dark:bg-gray-900 min-h-[100dvh] sm:shadow-2xl sm:shadow-black/10">
+      <main className="max-w-md sm:max-w-xl md:max-w-2xl mx-auto bg-slate-100 dark:bg-gray-900 min-h-[100dvh] sm:shadow-2xl sm:shadow-black/10">
         {children}
       </main>
 

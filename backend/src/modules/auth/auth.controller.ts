@@ -12,6 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 
 import { AuthService } from './auth.service';
 import { AuthGuard } from '../../common/guards/auth.guard';
@@ -23,15 +24,21 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 
 const REFRESH_COOKIE = 'refresh_token';
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.COOKIE_SECURE === 'true',
-  sameSite: 'lax' as const,
-  maxAge: COOKIE_MAX_AGE,
-  path: '/',
-};
+
+/** Build cookie options, adjusting `secure` flag based on actual request protocol. */
+function getCookieOptions(req: Request) {
+  const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+  return {
+    httpOnly: true,
+    secure: isSecure,
+    sameSite: 'strict' as const,
+    maxAge: COOKIE_MAX_AGE,
+    path: '/',
+  };
+}
 
 @Controller('auth')
+@Throttle({ default: { ttl: 60_000, limit: 5 } }) // Auth: stricter — 5 req/min per IP
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
@@ -52,8 +59,8 @@ export class AuthController {
     const ipAddress = this.extractIp(req);
     const userAgent = (req.headers['user-agent'] as string) ?? null;
     const { accessToken, refreshToken, user } = await this.authService.login(dto, ipAddress, userAgent);
-    res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
-    return { success: true, data: { accessToken, user } };
+    res.cookie(REFRESH_COOKIE, refreshToken, getCookieOptions(req));
+    return { success: true, data: { accessToken, refreshToken, user } };
   }
 
   /**
@@ -76,7 +83,7 @@ export class AuthController {
   @Get('lookup')
   async lookupUnactivated(@Query('studentId') studentId: string) {
     if (!studentId) {
-      return { success: false, error: 'MISSING_PARAM', message: 'studentId is required' };
+      return { success: false, error: 'MISSING_PARAM', message: 'กรุณาระบุรหัสนักศึกษา' };
     }
     const data = await this.authService.lookupUnactivated(studentId);
     return { success: true, data };
@@ -99,10 +106,13 @@ export class AuthController {
    */
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Req() req: Request & { cookies: Record<string, string> }) {
-    const refreshToken = req.cookies?.[REFRESH_COOKIE];
+  async refresh(
+    @Req() req: Request & { cookies: Record<string, string> },
+    @Body() body: { refreshToken?: string },
+  ) {
+    const refreshToken = req.cookies?.[REFRESH_COOKIE] || body?.refreshToken;
     if (!refreshToken) {
-      throw new UnauthorizedException('No refresh token');
+      throw new UnauthorizedException('ไม่พบ Refresh Token');
     }
     const data = await this.authService.refresh(refreshToken);
     return { success: true, data };
@@ -125,7 +135,7 @@ export class AuthController {
       await this.authService.logout(refreshToken);
     }
     res.clearCookie(REFRESH_COOKIE, { path: '/' });
-    return { success: true, message: 'Logged out successfully' };
+    return { success: true, message: 'ออกจากระบบสำเร็จ' };
   }
 
   /**
@@ -150,7 +160,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() dto: ResetPasswordDto) {
     await this.authService.resetPassword(dto.token, dto.newPassword);
-    return { success: true, message: 'Password reset successfully. Please log in again.' };
+    return { success: true, message: 'รีเซ็ตรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบใหม่' };
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────

@@ -35,6 +35,16 @@ const DAY_NAMES = [
   'Saturday',
 ];
 
+const DAY_NAMES_TH = [
+  'อาทิตย์',
+  'จันทร์',
+  'อังคาร',
+  'พุธ',
+  'พฤหัสบดี',
+  'ศุกร์',
+  'เสาร์',
+];
+
 @Injectable()
 export class AppointmentsService {
   private readonly logger = new Logger(AppointmentsService.name);
@@ -54,11 +64,11 @@ export class AppointmentsService {
       `SELECT id FROM users WHERE id = $1 AND role IN ('staff', 'admin') AND is_active = true`,
       [staffId],
     );
-    if (!staff) throw new NotFoundException(`Staff user '${staffId}' not found.`);
+    if (!staff) throw new NotFoundException('ไม่พบบุคลากร');
 
     // Ensure start < end
     if (dto.startTime >= dto.endTime) {
-      throw new BadRequestException('startTime must be before endTime.');
+      throw new BadRequestException('เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุด');
     }
 
     const row = await this.db.queryOne<SlotDetailRow>(
@@ -158,11 +168,11 @@ export class AppointmentsService {
        WHERE s.id = $1`,
       [id],
     );
-    if (!slot) throw new NotFoundException(`Slot '${id}' not found.`);
+    if (!slot) throw new NotFoundException('ไม่พบช่วงเวลานัดหมาย');
 
     // Only slot owner or admin can update
     if (callerRole !== 'admin' && slot.staff_id !== callerId) {
-      throw new ForbiddenException('You can only update your own slots.');
+      throw new ForbiddenException('คุณสามารถแก้ไขช่วงเวลาของคุณเท่านั้น');
     }
 
     // Build SET clause dynamically
@@ -183,7 +193,7 @@ export class AppointmentsService {
     const newStart = dto.startTime ?? slot.start_time;
     const newEnd   = dto.endTime   ?? slot.end_time;
     if (newStart >= newEnd) {
-      throw new BadRequestException('startTime must be before endTime.');
+      throw new BadRequestException('เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุด');
     }
 
     sets.push(`updated_at = NOW()`);
@@ -207,10 +217,10 @@ export class AppointmentsService {
       `SELECT id, staff_id FROM appointment_slots WHERE id = $1`,
       [id],
     );
-    if (!slot) throw new NotFoundException(`Slot '${id}' not found.`);
+    if (!slot) throw new NotFoundException('ไม่พบช่วงเวลานัดหมาย');
 
     if (callerRole !== 'admin' && slot.staff_id !== callerId) {
-      throw new ForbiddenException('You can only deactivate your own slots.');
+      throw new ForbiddenException('คุณสามารถปิดการใช้งานช่วงเวลาของคุณเท่านั้น');
     }
 
     await this.db.execute(
@@ -237,7 +247,7 @@ export class AppointmentsService {
       `SELECT * FROM appointment_slots WHERE id = $1 AND is_active = true`,
       [dto.slotId],
     );
-    if (!slot) throw new NotFoundException(`Appointment slot '${dto.slotId}' not found or inactive.`);
+    if (!slot) throw new NotFoundException('ไม่พบช่วงเวลานัดหมายหรือช่วงเวลาไม่ได้เปิดใช้งาน');
 
     // Validate date matches slot's day_of_week
     const bookDate = new Date(dto.date);
@@ -247,7 +257,7 @@ export class AppointmentsService {
     // getDay() returns 0=Sunday … 6=Saturday, matching PostgreSQL DOW
     if (bookDate.getDay() !== slot.day_of_week) {
       throw new BadRequestException(
-        `Slot is only available on ${DAY_NAMES[slot.day_of_week]}. Chosen date falls on ${DAY_NAMES[bookDate.getDay()]}.`,
+        `ช่วงเวลานี้เปิดให้บริการเฉพาะวัน${DAY_NAMES_TH[slot.day_of_week]} แต่วันที่เลือกเป็นวัน${DAY_NAMES_TH[bookDate.getDay()]}`,
       );
     }
 
@@ -286,7 +296,7 @@ export class AppointmentsService {
         `INSERT INTO appointments (patient_id, staff_id, slot_id, appointment_date, appointment_time, reason, status, notes)
          VALUES ($1, $2, $3, $4, $5, $6, 'scheduled', $7)
          RETURNING id`,
-        [patientId, slot.staff_id, dto.slotId, dto.date, slot.start_time, dto.reason, dto.notes ?? null],
+        [patientId, slot.staff_id, dto.slotId, dto.date, slot.start_time, dto.reason || dto.notes || 'นัดหมายทั่วไป', dto.notes ?? null],
       );
       const apptId = apptResult.rows[0].id;
 
@@ -297,8 +307,8 @@ export class AppointmentsService {
          VALUES ($1, 'appointment', $2, $3, 'appointment', $4)`,
         [
           slot.staff_id,
-          'New Appointment',
-          `A patient has booked an appointment on ${dto.date} at ${slot.start_time}.`,
+          'นัดหมายใหม่',
+          `ผู้ป่วยจองนัดหมายวันที่ ${dto.date} เวลา ${slot.start_time}`,
           apptId,
         ],
       );
@@ -312,8 +322,8 @@ export class AppointmentsService {
     // Real-time notification to the staff member
     this.ws.notifyUser(slot.staff_id, {
       type: 'appointment',
-      title: 'New Appointment',
-      message: `A patient has booked an appointment on ${dto.date} at ${slot.start_time}.`,
+      title: 'นัดหมายใหม่',
+      message: `ผู้ป่วยจองนัดหมายวันที่ ${dto.date} เวลา ${slot.start_time}`,
       referenceType: 'appointment',
       referenceId: appointment,
     });
@@ -447,7 +457,7 @@ export class AppointmentsService {
     callerRole: string,
   ): Promise<Appointment> {
     const row = await this.getAppointmentDetailRow(id);
-    if (!row) throw new NotFoundException(`Appointment '${id}' not found.`);
+    if (!row) throw new NotFoundException('ไม่พบนัดหมาย');
 
     if (callerRole === 'student' && row.patient_id !== callerId) {
       throw new ForbiddenException('คุณสามารถดูนัดหมายของคุณเท่านั้น');
@@ -471,14 +481,14 @@ export class AppointmentsService {
       `SELECT id, patient_id, staff_id, status, appointment_date::text, appointment_time FROM appointments WHERE id = $1`,
       [id],
     );
-    if (!row) throw new NotFoundException(`Appointment '${id}' not found.`);
+    if (!row) throw new NotFoundException('ไม่พบนัดหมาย');
 
     // Only the patient or staff can cancel
     if (callerRole === 'student' && row.patient_id !== callerId) {
-      throw new ForbiddenException('You can only cancel your own appointments.');
+      throw new ForbiddenException('คุณสามารถยกเลิกนัดหมายของคุณเท่านั้น');
     }
     if (row.status !== 'scheduled') {
-      throw new BadRequestException(`Cannot cancel an appointment with status '${row.status}'.`);
+      throw new BadRequestException('ไม่สามารถยกเลิกนัดหมายในสถานะปัจจุบันได้');
     }
 
     await this.db.execute(
@@ -526,10 +536,10 @@ export class AppointmentsService {
       `SELECT id, patient_id, status FROM appointments WHERE id = $1`,
       [id],
     );
-    if (!row) throw new NotFoundException(`Appointment '${id}' not found.`);
+    if (!row) throw new NotFoundException('ไม่พบนัดหมาย');
 
     if (row.status !== 'scheduled') {
-      throw new BadRequestException(`Cannot reschedule an appointment with status '${row.status}'.`);
+      throw new BadRequestException('ไม่สามารถเลื่อนนัดหมายในสถานะปัจจุบันได้');
     }
 
     // Validate new slot
@@ -537,7 +547,7 @@ export class AppointmentsService {
       `SELECT * FROM appointment_slots WHERE id = $1 AND is_active = true`,
       [dto.slotId],
     );
-    if (!slot) throw new NotFoundException(`Appointment slot '${dto.slotId}' not found or inactive.`);
+    if (!slot) throw new NotFoundException('ไม่พบช่วงเวลานัดหมายหรือช่วงเวลาไม่ได้เปิดใช้งาน');
 
     // Validate date matches slot's day_of_week
     const bookDate = new Date(dto.date);
@@ -546,7 +556,7 @@ export class AppointmentsService {
     }
     if (bookDate.getDay() !== slot.day_of_week) {
       throw new BadRequestException(
-        `Slot is only available on ${DAY_NAMES[slot.day_of_week]}. Chosen date falls on ${DAY_NAMES[bookDate.getDay()]}.`,
+        `ช่วงเวลานี้เปิดให้บริการเฉพาะวัน${DAY_NAMES_TH[slot.day_of_week]} แต่วันที่เลือกเป็นวัน${DAY_NAMES_TH[bookDate.getDay()]}`,
       );
     }
 
@@ -632,11 +642,11 @@ export class AppointmentsService {
       `SELECT id, patient_id, status FROM appointments WHERE id = $1`,
       [id],
     );
-    if (!row) throw new NotFoundException(`Appointment '${id}' not found.`);
+    if (!row) throw new NotFoundException('ไม่พบนัดหมาย');
 
     if (!allowedFrom.includes(row.status)) {
       throw new BadRequestException(
-        `Cannot transition to '${newStatus}' from status '${row.status}'.`,
+        'ไม่สามารถเปลี่ยนสถานะนัดหมายจากสถานะปัจจุบันได้',
       );
     }
 

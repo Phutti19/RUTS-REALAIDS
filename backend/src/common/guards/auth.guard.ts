@@ -28,19 +28,23 @@ export class AuthGuard implements CanActivate {
     const authHeader = request.headers.authorization;
 
     if (!authHeader?.startsWith('Bearer ')) {
-      throw new UnauthorizedException('No bearer token provided');
+      throw new UnauthorizedException('ไม่พบ Token กรุณาเข้าสู่ระบบ');
     }
 
     const token = authHeader.slice(7);
 
     try {
-      const payload = jwt.verify(token, process.env.JWT_SECRET ?? '') as JwtPayload;
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
+        throw new UnauthorizedException('เซิร์ฟเวอร์ไม่ได้ตั้งค่า JWT_SECRET');
+      }
+      const payload = jwt.verify(token, jwtSecret) as JwtPayload;
       request.user = { id: payload.sub, role: payload.role };
       return true;
     } catch (err: unknown) {
       const isExpired = err instanceof jwt.TokenExpiredError;
       throw new UnauthorizedException(
-        isExpired ? 'Token has expired' : 'Invalid token',
+        isExpired ? 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่' : 'Token ไม่ถูกต้อง',
       );
     }
   }

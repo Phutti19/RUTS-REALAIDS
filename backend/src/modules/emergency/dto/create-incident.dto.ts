@@ -12,12 +12,12 @@ import { Transform } from 'class-transformer';
 
 export class CreateIncidentDto {
   @IsEnum(['injury', 'illness', 'accident', 'fainting', 'other'], {
-    message: 'incidentType must be one of: injury, illness, accident, fainting, other',
+    message: 'ประเภทเหตุฉุกเฉินต้องเป็น injury, illness, accident, fainting หรือ other',
   })
   incidentType: string;
 
   @IsEnum(['low', 'medium', 'high', 'critical'], {
-    message: 'severity must be one of: low, medium, high, critical',
+    message: 'ระดับความรุนแรงต้องเป็น low, medium, high หรือ critical',
   })
   severity: string;
 
@@ -27,13 +27,13 @@ export class CreateIncidentDto {
   @Transform(({ value }: { value: string }) => value?.trim() || null)
   description?: string | null;
 
-  @IsNotEmpty({ message: 'latitude is required' })
+  @IsNotEmpty({ message: 'กรุณาระบุละติจูด' })
   @IsNumber()
   @Min(-90)
   @Max(90)
   latitude: number;
 
-  @IsNotEmpty({ message: 'longitude is required' })
+  @IsNotEmpty({ message: 'กรุณาระบุลองจิจูด' })
   @IsNumber()
   @Min(-180)
   @Max(180)

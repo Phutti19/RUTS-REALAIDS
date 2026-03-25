@@ -19,6 +19,6 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   @MaxLength(20)
-  @Matches(/^[0-9+\-\s()]*$/, { message: 'Invalid phone number format' })
+  @Matches(/^[0-9+\-\s()]*$/, { message: 'รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง' })
   phone?: string;
 }

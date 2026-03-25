@@ -39,7 +39,7 @@ export class AppointmentSlotsController {
   @Get('available')
   async getAvailableSlots(@Query('date') date: string) {
     if (!date) {
-      return { success: false, error: 'MISSING_PARAM', message: 'date query param is required (YYYY-MM-DD)' };
+      return { success: false, error: 'MISSING_PARAM', message: 'กรุณาระบุวันที่ (รูปแบบ YYYY-MM-DD)' };
     }
     const data = await this.appointmentsService.getAvailableSlots(date);
     return { success: true, data };

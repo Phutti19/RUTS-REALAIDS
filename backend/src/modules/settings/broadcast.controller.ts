@@ -46,7 +46,7 @@ export class BroadcastController {
       );
     }
 
-    return { success: true, message: 'Broadcast sent successfully' };
+    return { success: true, message: 'ส่งประกาศสำเร็จ' };
   }
 
   @Get('stats')

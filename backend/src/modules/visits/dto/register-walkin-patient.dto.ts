@@ -44,15 +44,15 @@ export class RegisterWalkInPatientDto {
    */
   @ValidateIf((o) => o.patientType === 'student')
   @IsString()
-  @IsNotEmpty({ message: 'studentId is required for student patients' })
+  @IsNotEmpty({ message: 'กรุณาระบุรหัสนักศึกษา' })
   @Matches(/^[A-Za-z0-9\-]{4,20}$/, {
-    message: 'studentId must be 4–20 alphanumeric characters (hyphens allowed)',
+    message: 'รหัสนักศึกษาต้องเป็นตัวอักษรหรือตัวเลข 4-20 ตัว (อนุญาตเครื่องหมายขีด)',
   })
   @Transform(({ value }: { value: string }) => value?.trim())
   studentId?: string;
 
   @IsOptional()
-  @IsEmail({}, { message: 'Invalid email format' })
+  @IsEmail({}, { message: 'รูปแบบอีเมลไม่ถูกต้อง' })
   @Transform(({ value }: { value: string }) => value?.toLowerCase().trim())
   email?: string;
 
@@ -82,7 +82,7 @@ export class RegisterWalkInPatientDto {
   yearOfStudy?: number | null;
 
   @IsOptional()
-  @IsDateString({}, { message: 'birthDate must be a valid date string (YYYY-MM-DD)' })
+  @IsDateString({}, { message: 'วันเกิดต้องเป็นรูปแบบวันที่ที่ถูกต้อง (YYYY-MM-DD)' })
   birthDate?: string | null;
 
   /** National ID — useful for external visitors */

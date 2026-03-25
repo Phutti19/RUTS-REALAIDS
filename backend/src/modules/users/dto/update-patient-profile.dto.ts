@@ -22,7 +22,7 @@ export class UpdatePatientProfileDto {
 
   @IsOptional()
   @IsString()
-  @Matches(/^\d{13}$/, { message: 'national_id must be 13 digits' })
+  @Matches(/^\d{13}$/, { message: 'เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก' })
   nationalId?: string | null;
 
   /** ISO date string YYYY-MM-DD */

@@ -19,6 +19,7 @@ interface WsClient {
   userId: string;
   role: 'student' | 'staff' | 'admin';
   connectedAt: Date;
+  isAlive: boolean;
 }
 
 interface WsMessage {
@@ -48,11 +49,14 @@ export const WS_EVENTS = {
 @Injectable()
 export class WsService {
   private wss!: WebSocket.Server;
+  private heartbeatInterval!: NodeJS.Timeout;
 
   // connectionId → WsClient (one user can have multiple tabs open)
   private readonly clients = new Map<string, WsClient>();
 
   private readonly logger = new Logger(WsService.name);
+
+  private static readonly HEARTBEAT_INTERVAL_MS = 30_000; // 30 seconds
 
   // ── Initialization ──────────────────────────────────────────────────────
 
@@ -67,7 +71,27 @@ export class WsService {
       this.handleConnection(ws, req);
     });
 
-    this.logger.log('WebSocket server attached to HTTP server');
+    // ── Heartbeat: ping every 30s, terminate stale connections ──
+    this.heartbeatInterval = setInterval(() => {
+      this.clients.forEach((client, connectionId) => {
+        if (!client.isAlive) {
+          this.logger.log(
+            `[heartbeat] stale connection terminated userId=${client.userId} connId=${connectionId}`,
+          );
+          client.ws.terminate();
+          this.clients.delete(connectionId);
+          return;
+        }
+        client.isAlive = false;
+        client.ws.ping();
+      });
+    }, WsService.HEARTBEAT_INTERVAL_MS);
+
+    this.wss.on('close', () => {
+      clearInterval(this.heartbeatInterval);
+    });
+
+    this.logger.log('WebSocket server attached to HTTP server (heartbeat: 30s)');
   }
 
   // ── Connection handling ─────────────────────────────────────────────────
@@ -76,7 +100,7 @@ export class WsService {
     // Validate origin
     const origin = req.headers.origin;
     const allowedOrigins = (process.env.CORS_ORIGIN ?? '').split(',').map((o) => o.trim()).filter(Boolean);
-    if (allowedOrigins.length > 0 && origin && !allowedOrigins.some((o) => origin.startsWith(o))) {
+    if (allowedOrigins.length > 0 && origin && !allowedOrigins.includes(origin)) {
       ws.close(1008, 'Origin not allowed');
       return;
     }
@@ -111,6 +135,7 @@ export class WsService {
       userId: payload.sub,
       role: payload.role,
       connectedAt: new Date(),
+      isAlive: true,
     };
 
     this.clients.set(connectionId, client);
@@ -119,6 +144,7 @@ export class WsService {
     );
 
     // Register WS event listeners
+    ws.on('pong', () => { client.isAlive = true; });
     ws.on('message', (raw) => this.handleMessage(connectionId, raw));
     ws.on('close', () => this.handleDisconnect(connectionId));
     ws.on('error', (err) =>

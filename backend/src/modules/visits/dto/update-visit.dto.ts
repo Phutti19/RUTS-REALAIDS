@@ -65,7 +65,7 @@ export class UpdateVisitDto {
 
   @IsOptional()
   @IsEnum(['waiting', 'in_treatment', 'completed', 'referred'], {
-    message: 'status must be one of: waiting, in_treatment, completed, referred',
+    message: 'สถานะต้องเป็น waiting, in_treatment, completed หรือ referred',
   })
   status?: string;
 }

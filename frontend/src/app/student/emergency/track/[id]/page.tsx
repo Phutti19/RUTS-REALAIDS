@@ -75,6 +75,8 @@ export default function TrackIncidentPage({ params }: { params: Promise<{ id: st
   const [error, setError] = useState("");
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [infirmaryPhone, setInfirmaryPhone] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState<boolean | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     api.get<IncidentDetail>(`/incidents/${id}`).then((res) => {
@@ -88,6 +90,9 @@ export default function TrackIncidentPage({ params }: { params: Promise<{ id: st
     });
     api.get<{ name: string; phone: string | null }>("/settings/infirmary").then((res) => {
       if (res.success && res.data?.phone) setInfirmaryPhone(res.data.phone);
+    });
+    api.get<{ confirmed: boolean }>(`/incidents/${id}/confirmed`).then((res) => {
+      if (res.success && res.data) setConfirmed(res.data.confirmed);
     });
   }, [id]);
 
@@ -104,6 +109,18 @@ export default function TrackIncidentPage({ params }: { params: Promise<{ id: st
       setIncident((prev) => prev ? { ...prev, status: "accepted", responder: data.responder } : prev);
     }
   }, [id]);
+
+  const handleConfirm = async () => {
+    setConfirming(true);
+    try {
+      const res = await api.post<{ confirmed: boolean }>(`/incidents/${id}/confirm`);
+      if (res.success) setConfirmed(true);
+    } catch {
+      // silently fail
+    } finally {
+      setConfirming(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -250,6 +267,53 @@ export default function TrackIncidentPage({ params }: { params: Promise<{ id: st
             })}
           </div>
         </div>
+
+        {/* Confirmation card */}
+        {isCompleted && confirmed === false && (
+          <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-xl p-4 shadow-sm border border-emerald-200 dark:border-emerald-800">
+            <div className="text-center space-y-3">
+              <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/40 rounded-full flex items-center justify-center mx-auto">
+                <ShieldCheck size={24} className="text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-800 dark:text-white">ยืนยันการรับความช่วยเหลือ</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  กรุณายืนยันว่าคุณได้รับการช่วยเหลือเรียบร้อยแล้ว
+                </p>
+              </div>
+              <button
+                onClick={handleConfirm}
+                disabled={confirming}
+                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+              >
+                {confirming ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <CheckCircle2 size={16} />
+                )}
+                {confirming ? "กำลังยืนยัน..." : "ยืนยันว่าได้รับการช่วยเหลือแล้ว"}
+              </button>
+              <p className="text-[10px] text-gray-400">
+                หากไม่กดยืนยัน ระบบจะยืนยันให้อัตโนมัติใน 24 ชั่วโมง
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmed success */}
+        {isCompleted && confirmed === true && (
+          <div className="bg-emerald-50 dark:bg-emerald-950/20 rounded-xl p-3.5 shadow-sm border border-emerald-200 dark:border-emerald-800">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/40 rounded-full flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 size={20} className="text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">ยืนยันเรียบร้อยแล้ว</p>
+                <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">ขอบคุณที่ยืนยันการรับความช่วยเหลือ</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Responder */}
         {incident.responder && (
