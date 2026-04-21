@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, type FormEvent, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Eye,
@@ -56,7 +56,7 @@ function LoginPageInner() {
     setPassword("");
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -294,7 +294,7 @@ function LoginPageInner() {
                       href="/register"
                       className="text-blue-700 hover:text-blue-900 hover:underline transition-colors font-medium"
                     >
-                      เปลี่ยนรหัสผ่าน
+                      สมัครสมาชิก
                     </a>
                   </>
                 )}

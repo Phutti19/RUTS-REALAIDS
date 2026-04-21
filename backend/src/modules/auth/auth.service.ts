@@ -10,6 +10,7 @@ import * as jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
 import { DatabaseService } from '../../database/db.service';
+import { EmailService } from '../../email/email.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ActivateAccountDto } from './dto/activate-account.dto';
@@ -32,7 +33,10 @@ const RESET_TOKEN_TTL_MINUTES = 60;
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly email: EmailService,
+  ) {}
 
   // ── Public methods ──────────────────────────────────────────────────────────
 
@@ -231,14 +235,14 @@ export class AuthService {
     );
   }
 
-  async forgotPassword(email: string): Promise<{ message: string; token?: string }> {
+  async forgotPassword(emailAddr: string): Promise<{ message: string; token?: string }> {
     // Generic message — never reveal whether email exists (prevents user enumeration)
     const genericMessage =
       'หากอีเมลนี้มีอยู่ในระบบ ลิงก์รีเซ็ตรหัสผ่านจะถูกส่งไปยังอีเมลของคุณ';
 
-    const user = await this.db.queryOne<{ id: string }>(
-      `SELECT id FROM users WHERE email = $1 AND is_active = true`,
-      [email],
+    const user = await this.db.queryOne<{ id: string; first_name: string }>(
+      `SELECT id, first_name FROM users WHERE email = $1 AND is_active = true`,
+      [emailAddr],
     );
 
     if (!user) return { message: genericMessage };
@@ -261,12 +265,17 @@ export class AuthService {
       [user.id, tokenHash, expiresAt],
     );
 
-    this.logger.log(`Password reset requested for: ${email}`);
+    this.logger.log(`Password reset requested for: ${emailAddr}`);
 
     const response: { message: string; token?: string } = { message: genericMessage };
 
-    // Expose token in development only (production would send email)
-    if (process.env.NODE_ENV !== 'production') {
+    // Send reset email (non-blocking — don't let email failure affect response)
+    if (this.email.isConfigured) {
+      this.email
+        .sendResetPasswordEmail(emailAddr, rawToken, user.first_name)
+        .catch((err) => this.logger.error(`Email send error: ${err.message}`));
+    } else if (process.env.NODE_ENV !== 'production') {
+      // Expose token in dev mode only when SMTP is not configured
       response.token = rawToken;
     }
 

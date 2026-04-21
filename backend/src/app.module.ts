@@ -9,6 +9,7 @@ import { AppService } from './app.service';
 // ── Core infrastructure ──
 import { DatabaseModule } from './database/db.module';
 import { WsModule } from './websocket/ws.module';
+import { EmailModule } from './email/email.module';
 
 // ── Feature modules ──
 import { AuthModule } from './modules/auth/auth.module';
@@ -37,6 +38,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     ScheduleModule.forRoot(),
     DatabaseModule,
     WsModule,
+    EmailModule,
 
     // Feature modules
     AuthModule,
