@@ -51,16 +51,24 @@ npm install
 
 ### 2. Database Setup
 
-```bash
-# Create database
-psql -U realaids -c "CREATE DATABASE ruts_realaids;"
+โครงสร้างฐานข้อมูลในโปรเจกต์นี้คาดหวังให้ใช้ฐานข้อมูลชื่อ `ruts_realaids` และผู้ใช้ `realaids` ตามค่าเริ่มต้นในไฟล์ `.env` ของโปรเจกต์
 
-# Run migration
+```bash
+# 1) สร้างผู้ใช้และฐานข้อมูล (ถ้ายังไม่มี)
+psql -U postgres -c "CREATE USER realaids WITH PASSWORD 'realaids1234';"
+psql -U postgres -c "CREATE DATABASE ruts_realaids OWNER realaids;"
+
+# 2) สร้างโครงสร้างตารางและ enum ที่จำเป็น
+psql -U realaids -d ruts_realaids -f database/schema.sql
+
+# 3) ใช้ migration/seed เพิ่มเติมสำหรับ faculties, departments และคอลัมน์เสริม
 psql -U realaids -d ruts_realaids -f database/migration.sql
 
-# Verify
+# 4) ตรวจสอบสถานะฐานข้อมูล (ถ้าต้องการ)
 psql -U realaids -d ruts_realaids -f database/verify.sql
 ```
+
+> หมายเหตุ: หากคุณต้องการใช้ข้อมูลทดสอบเพิ่มเติม สามารถรันไฟล์ `database/seed-data.sql` หรือ `database/seed-test-data.js` ได้ตามลำดับที่ต้องการ
 
 ### 3. Environment Variables
 
